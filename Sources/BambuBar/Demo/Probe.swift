@@ -106,7 +106,10 @@ enum Probe {
         log("opening \(transport == .rtsps ? "RTSPS on port 322" : "the JPEG stream on port 6000") at \(host)")
         client.start()
         Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            MainActor.assumeIsolated { log("\(frames) frames, \(keyframes) keyframes, \(bytes / 1024) KB so far") }
+            MainActor.assumeIsolated {
+                // JPEG frames arrive decoded, so only the video stream has keyframes and a byte count.
+                log(transport == .jpeg ? "\(frames) frames so far" : "\(frames) frames, \(keyframes) keyframes, \(bytes / 1024) KB so far")
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
             let elapsed = Date().timeIntervalSince(started)
