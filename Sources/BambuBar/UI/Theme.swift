@@ -53,6 +53,37 @@ struct SectionLabel: View {
 }
 
 /// A temperature readout: value large, target small, a hairline gauge underneath.
+/// Nozzle (two on H2D, H2C and X2D), bed, and the chamber where the model has a sensor; scaled to the model's
+/// maximum temperatures.
+struct TemperatureTiles: View {
+    var status: PrinterStatus
+    var model: PrinterModel?
+
+    var body: some View {
+        let nozzleMax = Double(model?.nozzleMax ?? 300)
+        if let left = status.secondNozzle {
+            TemperatureTile(title: "Left", symbol: "flame.fill", temperature: left, tint: Palette.nozzle, maxValue: nozzleMax)
+            TemperatureTile(title: "Right", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle, maxValue: nozzleMax)
+        } else {
+            TemperatureTile(title: "Nozzle", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle, maxValue: nozzleMax)
+        }
+        TemperatureTile(title: "Bed", symbol: "heat.waves", temperature: status.bed, tint: Palette.bed, maxValue: Double(model?.bedMax ?? 110))
+        if let chamber = status.chamber {
+            if let heater = model?.chamberHeaterMax {
+                TemperatureTile(title: "Chamber", symbol: "thermometer.medium",
+                                temperature: Temperature(current: chamber, target: status.chamberTarget ?? 0),
+                                tint: Palette.chamber, maxValue: Double(heater))
+            } else {
+                TemperatureTile(title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: chamber,
+                                tint: Palette.chamber, maxValue: 65)
+            }
+        } else if model?.hasChamberSensor ?? true {
+            // A model with a sensor that hasn't reported yet.
+            TemperatureTile(title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: nil, tint: Palette.chamber, maxValue: 65)
+        }
+    }
+}
+
 struct TemperatureTile: View {
     var title: String
     var symbol: String

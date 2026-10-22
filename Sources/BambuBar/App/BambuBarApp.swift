@@ -26,6 +26,8 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About Bambu Bar") { MainWindow.show(.about) }
+            Button("Check for Updates…") { Task { await UpdateChecker.shared.checkAndReport() } }
+                .disabled(UpdateChecker.shared.state == .checking)
         }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { MainWindow.show(.settings) }
@@ -33,7 +35,11 @@ struct AppCommands: Commands {
         }
         CommandGroup(replacing: .newItem) {}
         CommandGroup(before: .sidebar) {
-            ForEach(Array(AppSection.allCases.enumerated()), id: \.element) { index, section in
+            if store.hasMultiplePrinters {
+                Button(AppSection.fleet.title) { MainWindow.show(.fleet) }
+                    .keyboardShortcut("0")
+            }
+            ForEach(Array(AppSection.allCases.filter { $0 != .fleet }.enumerated()), id: \.element) { index, section in
                 Button(section.title) { MainWindow.show(section) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
             }
@@ -60,7 +66,7 @@ struct AppCommands: Commands {
             Divider()
             Button(store.chamberLightOn ? "Turn Chamber Light Off" : "Turn Chamber Light On") { store.toggleLight() }
                 .keyboardShortcut("l")
-                .disabled(!store.isOnline)
+                .disabled(!store.isOnline || store.status?.chamberLightOn == nil)
         }
     }
 }
@@ -76,6 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         PrinterStore.shared.start()
+        UpdateChecker.shared.startAutomaticChecks()
+        WidgetUpdate.refreshIfUpdated()
         observeAppWindows()
         if let dir = ReadmeFrames.directory {
             ReadmeFrames.run(into: dir)
@@ -140,11 +148,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case overview, filament, widgets, settings, about
+    case fleet, overview, filament, widgets, settings, about
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .fleet: return "All Printers"
         case .overview: return "Printer"
         case .filament: return "Filament"
         case .widgets: return "Widgets"
@@ -155,6 +164,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .fleet: return "square.grid.2x2.fill"
         case .overview: return "printer.fill"
         case .filament: return "circle.circle.fill"
         case .widgets: return "widget.medium"

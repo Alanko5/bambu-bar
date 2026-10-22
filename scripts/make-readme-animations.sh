@@ -11,7 +11,7 @@ cd "$ROOT"
 [[ -x "build/App.noindex/Bambu Bar.app/Contents/MacOS/Bambu Bar" && "${1:-}" != "--build" ]] || CONFIG=Release "$ROOT/scripts/build.sh"
 mkdir -p "$ROOT/.github/assets"
 echo "==> Rendering frames"
-"build/App.noindex/Bambu Bar.app/Contents/MacOS/Bambu Bar" --demo printing --readme-frames "$WORK/frames" >/dev/null
+"build/App.noindex/Bambu Bar.app/Contents/MacOS/Bambu Bar" --demo printing --fleet --readme-frames "$WORK/frames" >/dev/null
 
 for name in showcase menubar widgets; do
   frames=("$WORK/frames/$name"/frame-*.png)
