@@ -134,15 +134,12 @@ struct CameraSurface: NSViewRepresentable {
 
 // MARK: - Player
 
-/// The feed with its state on top: a spinner while connecting, why it isn't showing, a LIVE badge.
+/// The feed with its state on top: a spinner while connecting, or why it isn't showing.
 struct CameraPlayer: View {
     var session: PrinterSession
     var cornerRadius: CGFloat = 16
     /// Smaller type for the menu bar panel.
     var compact = false
-    /// Where the LIVE badge goes, and how far in from the edges.
-    var badgeAlignment: Alignment = .topLeading
-    var badgeInset: EdgeInsets?
 
     var body: some View {
         let feed = session.camera!
@@ -163,10 +160,7 @@ struct CameraPlayer: View {
     private func stateOverlay(_ feed: CameraFeed) -> some View {
         switch feed.state {
         case .live:
-            liveBadge
-                .padding(badgeInset ?? EdgeInsets(top: compact ? 8 : 10, leading: compact ? 8 : 10,
-                                                  bottom: compact ? 8 : 10, trailing: compact ? 8 : 10))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: badgeAlignment)
+            EmptyView()
         case .idle, .connecting:
             message(symbol: nil, text: "Connecting to the camera…", busy: true)
         case .unavailable(let reason):
@@ -175,21 +169,6 @@ struct CameraPlayer: View {
             message(symbol: "exclamationmark.triangle", text: reason, retry: retrying ? nil : { feed.tryAgain() },
                     busy: retrying)
         }
-    }
-
-    private var liveBadge: some View {
-        HStack(spacing: 4) {
-            // A touch brighter than Palette.failed so it holds its own beside the white text.
-            Circle().fill(Color(red: 1, green: 0.27, blue: 0.27)).frame(width: 6, height: 6)
-            Text("LIVE")
-                .font(.system(size: compact ? 9 : 10, weight: .bold))
-                .tracking(0.5)
-                .foregroundColor(.white)
-        }
-        .fixedSize()
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(.black.opacity(0.45)))
     }
 
     private func message(symbol: String?, text: String, retry: (() -> Void)? = nil, busy: Bool = false) -> some View {
@@ -382,9 +361,7 @@ struct CameraWindowView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // The badge sits in the title bar's row, clear of the window buttons on the left.
-            CameraPlayer(session: session, cornerRadius: 0, badgeAlignment: .topTrailing,
-                         badgeInset: EdgeInsets(top: 7, leading: 0, bottom: 0, trailing: 10))
+            CameraPlayer(session: session, cornerRadius: 0)
             titleBar
             if hovering {
                 controls
