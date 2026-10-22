@@ -21,6 +21,8 @@ for name in showcase menubar widgets; do
     # 15 fps: alternate 67/66 ms so the total stays exact.
     args+=(-d $(( (i * 1000 + 7) / 15 - ((i - 1) * 1000 + 7) / 15 )) "${frames[$i]}")
   done
-  img2webp -loop 0 -lossy -q 80 -m 4 "${args[@]}" -o "$ROOT/.github/assets/$name.webp" >/dev/null
+  # Every frame a keyframe (-kmax 1): with lossy sub-frames, img2webp treats small changes as unchanged, so a
+  # crossfade between pages leaves the old page behind.
+  img2webp -loop 0 -lossy -q 78 -m 4 -kmax 1 "${args[@]}" -o "$ROOT/.github/assets/$name.webp" >/dev/null
   ls -lh "$ROOT/.github/assets/$name.webp" | awk '{print "    " $5}'
 done

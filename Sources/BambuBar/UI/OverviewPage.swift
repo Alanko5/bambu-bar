@@ -62,10 +62,11 @@ struct OverviewPage: View {
             SectionLabel(s.chamber == nil && store.config?.model?.isEnclosed == false ? "Temperatures & cooling" : "Temperatures & airflow")
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
-                    TemperatureTiles(status: s, model: store.config?.model)
+                    TemperatureTiles(status: s, model: store.config?.model, fillsHeight: true)
                     FanTile(status: s)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 

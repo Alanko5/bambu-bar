@@ -58,39 +58,42 @@ struct SectionLabel: View {
 struct TemperatureTiles: View {
     var status: PrinterStatus
     var model: PrinterModel?
+    /// Stretch to the row's height (beside the taller fan tile on the Printer page).
+    var fillsHeight = false
 
     var body: some View {
-        let nozzleMax = Double(model?.nozzleMax ?? 300)
         if let left = status.secondNozzle {
-            TemperatureTile(title: "Left", symbol: "flame.fill", temperature: left, tint: Palette.nozzle, maxValue: nozzleMax)
-            TemperatureTile(title: "Right", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle, maxValue: nozzleMax)
+            TemperatureTile(fillsHeight: fillsHeight, title: "Left", symbol: "flame.fill", temperature: left, tint: Palette.nozzle)
+            TemperatureTile(fillsHeight: fillsHeight, title: "Right", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle)
         } else {
-            TemperatureTile(title: "Nozzle", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle, maxValue: nozzleMax)
+            TemperatureTile(fillsHeight: fillsHeight, title: "Nozzle", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle)
         }
-        TemperatureTile(title: "Bed", symbol: "heat.waves", temperature: status.bed, tint: Palette.bed, maxValue: Double(model?.bedMax ?? 110))
+        TemperatureTile(fillsHeight: fillsHeight, title: "Bed", symbol: "heat.waves", temperature: status.bed, tint: Palette.bed)
         if let chamber = status.chamber {
-            if let heater = model?.chamberHeaterMax {
-                TemperatureTile(title: "Chamber", symbol: "thermometer.medium",
+            if model?.chamberHeaterMax != nil {
+                TemperatureTile(fillsHeight: fillsHeight, title: "Chamber", symbol: "thermometer.medium",
                                 temperature: Temperature(current: chamber, target: status.chamberTarget ?? 0),
-                                tint: Palette.chamber, maxValue: Double(heater))
+                                tint: Palette.chamber)
             } else {
-                TemperatureTile(title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: chamber,
-                                tint: Palette.chamber, maxValue: 65)
+                TemperatureTile(fillsHeight: fillsHeight, title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: chamber,
+                                tint: Palette.chamber)
             }
         } else if model?.hasChamberSensor ?? true {
             // A model with a sensor that hasn't reported yet.
-            TemperatureTile(title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: nil, tint: Palette.chamber, maxValue: 65)
+            TemperatureTile(fillsHeight: fillsHeight, title: "Chamber", symbol: "thermometer.medium", temperature: nil, plain: nil, tint: Palette.chamber)
         }
     }
 }
 
+/// One temperature, big. While a heater is still heating or cooling toward its target, the target follows it
+/// in small type ("164° → 220°"); once there, or with the heater off, only the reading shows.
 struct TemperatureTile: View {
+    var fillsHeight = false
     var title: String
     var symbol: String
     var temperature: Temperature?
     var plain: Double? = nil
     var tint: Color
-    var maxValue: Double = 300
 
     var body: some View {
         let current = temperature?.current ?? plain
@@ -98,53 +101,37 @@ struct TemperatureTile: View {
             HStack(spacing: 4) {
                 Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(heating ? tint : .secondary)
-                    .symbolEffect(.pulse, options: .repeating, isActive: rising)
+                    .symbolEffect(.pulse, options: .repeating, isActive: changing)
                 Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(current.map { "\(Int($0.rounded()))°" } ?? "–")
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
+                if changing, let target = temperature?.target {
+                    Text("→ \(Int(target))°")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(tint)
+                }
                 Spacer(minLength: 0)
             }
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            Text(targetText)
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-            GeometryReader { geo in
-                let fraction = min(1, max(0, (current ?? 0) / maxValue))
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.08))
-                    Capsule().fill(heating ? tint : Color.primary.opacity(0.3))
-                        .frame(width: max(3, geo.size.width * fraction))
-                    if let target = temperature?.target, target > 0 {
-                        Capsule().fill(Color.primary.opacity(0.6))
-                            .frame(width: 1.5, height: 7)
-                            .offset(x: geo.size.width * min(1, target / maxValue) - 0.75)
-                    }
-                }
-            }
-            .frame(height: 3)
         }
+        .frame(maxHeight: fillsHeight ? .infinity : nil, alignment: .topLeading)
         .panel(radius: 14, padding: 11)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title) \(current.map { "\(Int($0)) degrees" } ?? "unknown"), \(targetText)")
+        .accessibilityLabel("\(title) \(current.map { "\(Int($0)) degrees" } ?? "unknown")"
+                            + (changing ? ", \(temperature!.current < temperature!.target ? "heating" : "cooling") to \(Int(temperature!.target))" : ""))
     }
 
     private var heating: Bool { (temperature?.target ?? 0) > 0 }
-    private var rising: Bool {
+    /// Still on its way to the target.
+    private var changing: Bool {
         guard let t = temperature, t.target > 0 else { return false }
-        return t.current < t.target - 3
-    }
-
-    private var targetText: String {
-        guard let t = temperature else { return plain == nil ? "No sensor" : "Read only" }
-        if t.target <= 0 { return "Off" }
-        if t.isAtTarget { return "At \(Int(t.target))°" }
-        return t.current < t.target ? "Heating to \(Int(t.target))°" : "Cooling to \(Int(t.target))°"
+        return !t.isAtTarget
     }
 }
 

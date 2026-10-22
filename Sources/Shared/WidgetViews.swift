@@ -382,7 +382,7 @@ struct LargeWidgetView: View {
                     } else if let left = s.secondNozzle {
                         WidgetTempTile(title: "Left", symbol: "flame.fill", value: left.current, target: left.target, tint: Palette.nozzle)
                     } else if let fan = s.partFan {
-                        WidgetStatTile(title: "Part fan", symbol: "fan.fill", value: "\(fan)%", detail: s.speed.title + " speed",
+                        WidgetStatTile(title: "Part fan", symbol: "fan.fill", value: "\(fan)%",
                                        tint: Palette.chamber, active: fan > 0)
                     }
                 }
@@ -477,12 +477,20 @@ struct WidgetTempTile: View {
                 Image(systemName: symbol).font(.system(size: 9, weight: .semibold)).foregroundStyle((target ?? 0) > 0 ? tint : .secondary)
                 Text(title).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
             }
-            Text(value.map { Format.temperature($0) } ?? "–")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-            Text(target.map { $0 > 0 ? "→ \(Int($0))°" : "Off" } ?? "Read only")
-                .font(.system(size: 9.5, weight: .medium))
-                .foregroundStyle(.tertiary)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value.map { Format.temperature($0) } ?? "–")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                // The target only while the heater is still getting there.
+                if let target, target > 0, let value, abs(value - target) > 2 {
+                    Text("→ \(Int(target))°")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(tint)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
@@ -496,7 +504,6 @@ struct WidgetStatTile: View {
     var title: String
     var symbol: String
     var value: String
-    var detail: String
     var tint: Color
     var active: Bool
 
@@ -509,10 +516,6 @@ struct WidgetStatTile: View {
             Text(value)
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-            Text(detail)
-                .font(.system(size: 9.5, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
