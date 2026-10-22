@@ -140,6 +140,9 @@ struct CameraPlayer: View {
     var cornerRadius: CGFloat = 16
     /// Smaller type for the menu bar panel.
     var compact = false
+    /// Where the LIVE badge goes, and how far in from the edges.
+    var badgeAlignment: Alignment = .topLeading
+    var badgeInset: EdgeInsets?
 
     var body: some View {
         let feed = session.camera!
@@ -160,14 +163,10 @@ struct CameraPlayer: View {
     private func stateOverlay(_ feed: CameraFeed) -> some View {
         switch feed.state {
         case .live:
-            VStack {
-                HStack {
-                    liveBadge
-                    Spacer()
-                }
-                Spacer()
-            }
-            .padding(compact ? 8 : 10)
+            liveBadge
+                .padding(badgeInset ?? EdgeInsets(top: compact ? 8 : 10, leading: compact ? 8 : 10,
+                                                  bottom: compact ? 8 : 10, trailing: compact ? 8 : 10))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: badgeAlignment)
         case .idle, .connecting:
             message(symbol: nil, text: "Connecting to the camera…", busy: true)
         case .unavailable(let reason):
@@ -331,6 +330,8 @@ enum CameraWindow {
             backing: .buffered, defer: false)
         window.title = "\(session.config.name) Camera"
         window.titlebarAppearsTransparent = true
+        // The view draws the name itself, in white over a shade; the system title vanishes over a bright picture.
+        window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.backgroundColor = .black
         window.contentMinSize = NSSize(width: 320, height: 180)
@@ -380,7 +381,10 @@ struct CameraWindowView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            CameraPlayer(session: session, cornerRadius: 0)
+            // The badge sits in the title bar's row, clear of the window buttons on the left.
+            CameraPlayer(session: session, cornerRadius: 0, badgeAlignment: .topTrailing,
+                         badgeInset: EdgeInsets(top: 7, leading: 0, bottom: 0, trailing: 10))
+            titleBar
             if hovering {
                 controls
                     .padding(12)
@@ -391,6 +395,28 @@ struct CameraWindowView: View {
         .background(.black)
         .onHover { inside in withAnimation(.smooth(duration: 0.2)) { hovering = inside } }
         .onChange(of: session.camera.aspectRatio) { _, ratio in CameraWindow.setAspectRatio(ratio, for: session.id) }
+    }
+
+    /// The printer's name centred in the title bar, over a shade so it reads on any picture.
+    private var titleBar: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                LinearGradient(colors: [.black.opacity(0.6), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 52)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                Text(session.config.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 2)
+                    .lineLimit(1)
+                    .padding(.horizontal, 90)
+                    .frame(height: 28)
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
+            .frame(height: 52)
+            Spacer(minLength: 0)
+        }
+        .allowsHitTesting(false)
     }
 
     private var controls: some View {
