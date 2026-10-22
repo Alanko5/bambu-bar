@@ -139,6 +139,7 @@ The [GitHub Actions workflow](.github/workflows/build.yml) builds and uploads an
 - `--demo [printing|preparing|paused|finished|failed|idle|offline|unconfigured]` runs a simulated P2S; add `--fleet` for three printers. Nothing is saved and no network is used.
 - `scripts/emulator/printer.py` runs a pretend P2S on `127.0.0.1:8883` (needs `brew install mosquitto`): a TLS MQTT broker that replays a real P2S report, then prints, heats and obeys pause, resume, stop, speed and light. Connect with
   `"build/App.noindex/Bambu Bar.app/Contents/MacOS/Bambu Bar" --connect 127.0.0.1 22E00EMULATOR0 12345678 --insecure-tls`
+- `--connect <ip> <serial> <access-code> [--model <code>]` works with real printers too, saving nothing; `--model C12` (P1S), `BL-P001` (X1C) and so on set the model, which picks the drawing and the camera transport (default `N7`, the P2S).
 - `--probe <ip> <serial> <access-code>` connects to a real printer from Terminal and prints what it reports.
 - `--probe-camera <ip> <serial> <access-code> [seconds] [--model P1S | --jpeg | --rtsp]` opens the camera from Terminal, logs the handshake (certificate, RTSP replies, SDP) and frame rate, and saves the first decoded frame to `$TMPDIR/bambubar-camera.png`. It assumes RTSPS (a P2S) unless told otherwise.
 - `scripts/showcase.sh <dir>` screenshots the panel, window and widgets in each demo state; `scripts/make-readme-animations.sh` renders the animations above, offscreen, from the demo printer.
