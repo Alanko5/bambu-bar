@@ -58,7 +58,10 @@ enum Probe {
         let a = CommandLine.arguments
         guard let i = a.firstIndex(of: "--probe-camera"), i + 3 < a.count else { return nil }
         let seconds = i + 4 < a.count ? Double(a[i + 4]) ?? 15 : 15
-        var transport = CameraTransport.forModel(a.firstIndex(of: "--model").flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil } ?? "P2S")
+        // `--model` takes a name ("P1S") or an SSDP code ("C12"), like `--connect`.
+        let model = a.firstIndex(of: "--model").flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil } ?? "P2S"
+        let named = PrinterModels.name(for: model)
+        var transport = CameraTransport.forModel(named == "Bambu Lab printer" ? model : named)
         if a.contains("--jpeg") { transport = .jpeg }
         if a.contains("--rtsp") { transport = .rtsps }
         return (a[i + 1], a[i + 2], a[i + 3], seconds, transport)
