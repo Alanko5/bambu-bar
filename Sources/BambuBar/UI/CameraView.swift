@@ -178,12 +178,9 @@ struct CameraPlayer: View {
     }
 
     private var liveBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(Color(red: 1, green: 0.2, blue: 0.2))
-                .frame(width: compact ? 8 : 9, height: compact ? 8 : 9)
-                .overlay(Circle().strokeBorder(.white.opacity(0.85), lineWidth: 1))
-                .shadow(color: .red.opacity(0.8), radius: 3)
+        HStack(spacing: 4) {
+            // A touch brighter than Palette.failed so it holds its own beside the white text.
+            Circle().fill(Color(red: 1, green: 0.27, blue: 0.27)).frame(width: 6, height: 6)
             Text("LIVE")
                 .font(.system(size: compact ? 9 : 10, weight: .bold))
                 .tracking(0.5)
