@@ -275,11 +275,17 @@ struct CameraPreview: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
                 Button { withAnimation(.smooth(duration: 0.25)) { expanded.toggle() } } label: {
-                    HStack(spacing: 5) {
+                    // Symbols in the label's own font, on its baseline, sit centred on the text; a smaller
+                    // font centred on the text's frame (which includes descender room) looks low.
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 11.5, weight: .bold))
+                            .imageScale(.small)
+                            .frame(width: 10)
                             .rotationEffect(.degrees(expanded ? 90 : 0))
-                        Image(systemName: "video.fill").font(.system(size: 10))
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 11.5))
+                            .imageScale(.small)
                         Text("Camera").font(.system(size: 11.5, weight: .semibold))
                         Spacer(minLength: 0)
                     }
