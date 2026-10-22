@@ -178,12 +178,18 @@ struct CameraPlayer: View {
     }
 
     private var liveBadge: some View {
-        HStack(spacing: 4) {
-            Circle().fill(Palette.failed).frame(width: 6, height: 6)
-            Text("LIVE").font(.system(size: compact ? 9 : 10, weight: .bold)).tracking(0.5)
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color(red: 1, green: 0.2, blue: 0.2))
+                .frame(width: compact ? 8 : 9, height: compact ? 8 : 9)
+                .overlay(Circle().strokeBorder(.white.opacity(0.85), lineWidth: 1))
+                .shadow(color: .red.opacity(0.8), radius: 3)
+            Text("LIVE")
+                .font(.system(size: compact ? 9 : 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundColor(.white)
         }
         .fixedSize()
-        .foregroundStyle(.white)
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(Capsule().fill(.black.opacity(0.45)))
@@ -312,7 +318,7 @@ struct CameraPreview: View {
 
 // MARK: - Window
 
-/// A resizable window per printer with just the camera, optionally kept above other windows.
+/// A resizable window per printer with just the camera, kept above other windows like picture in picture.
 @MainActor
 enum CameraWindow {
     private static var windows: [String: NSWindow] = [:]
@@ -333,6 +339,8 @@ enum CameraWindow {
         // The view draws the name itself, in white over a shade; the system title vanishes over a bright picture.
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
+        // A picture-in-picture window: it stays above other windows while you work elsewhere.
+        window.level = .floating
         window.backgroundColor = .black
         window.contentMinSize = NSSize(width: 320, height: 180)
         window.contentAspectRatio = NSSize(width: session.camera.aspectRatio, height: 1)
@@ -369,14 +377,10 @@ enum CameraWindow {
         window.setContentSize(NSSize(width: width, height: (width / ratio).rounded()))
     }
 
-    static func setFloating(_ floating: Bool, for serial: String) {
-        windows[serial]?.level = floating ? .floating : .normal
-    }
 }
 
 struct CameraWindowView: View {
     var session: PrinterSession
-    @State private var floating = false
     @State private var hovering = false
 
     var body: some View {
@@ -430,14 +434,6 @@ struct CameraWindowView: View {
             if let detail = session.camera.detail {
                 Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Button {
-                floating.toggle()
-                CameraWindow.setFloating(floating, for: session.id)
-            } label: {
-                Image(systemName: floating ? "pin.fill" : "pin")
-            }
-            .buttonStyle(.borderless)
-            .help(floating ? "Stop keeping this window on top" : "Keep this window on top of other windows")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12)
