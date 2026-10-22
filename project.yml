@@ -1,0 +1,69 @@
+# XcodeGen spec for Bambu Bar. scripts/build.sh generates BambuBar.xcodeproj from it;
+# the project itself is not checked in.
+name: BambuBar
+options:
+  bundleIdPrefix: dev.rolottr
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: PCZ6F8Q9DZ
+    APP_GROUP: "$(DEVELOPMENT_TEAM).dev.rolottr.BambuBar"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    GENERATE_INFOPLIST_FILE: NO
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: NO
+targets:
+  BambuBar:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/BambuBar
+      - path: Sources/Shared
+      - path: Resources/Certificates
+        type: folder
+        buildPhase: resources
+      - path: Resources/hms_en.json
+        buildPhase: resources
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rolottr.BambuBar
+        PRODUCT_NAME: Bambu Bar
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/Signing/BambuBar.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    dependencies:
+      - target: BambuBarWidget
+        embed: true
+        codeSign: true
+  BambuBarWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Sources/BambuBarWidget
+      - path: Sources/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rolottr.BambuBar.Widget
+        PRODUCT_NAME: BambuBarWidget
+        INFOPLIST_FILE: Resources/Widget-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/Signing/BambuBarWidget.entitlements
+        SKIP_INSTALL: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks"
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
