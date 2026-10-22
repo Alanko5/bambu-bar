@@ -4,9 +4,10 @@ import Observation
 
 /// One printer's camera, shared by every view that shows it.
 ///
-/// The stream runs only while at least one `CameraSurfaceView` is on screen (a hidden window, a collapsed
-/// preview or a closed panel don't count) and stops a few seconds after the last one goes, so switching from
-/// the panel to the window doesn't reconnect. Frames fan out to every surface; a surface that appears mid-stream
+/// The stream runs while at least one `CameraSurfaceView` is on screen (a hidden window, a collapsed
+/// preview or a closed panel don't count), and for the whole of a print so opening the panel shows it at once.
+/// Otherwise it stops a few seconds after the last surface goes, so switching from the panel to the window
+/// doesn't reconnect. Frames fan out to every surface; a surface that appears mid-stream
 /// is caught up from the last keyframe.
 @MainActor
 @Observable
@@ -24,6 +25,8 @@ final class CameraFeed {
     private(set) var state: State = .idle
     /// "H.264 · 1920×1080", once the stream has started.
     private(set) var detail: String?
+    /// Width over height of the picture; 16:9 until the stream says otherwise.
+    private(set) var aspectRatio: CGFloat = 16 / 9
 
     @ObservationIgnored private weak var session: PrinterSession?
     @ObservationIgnored private var client: CameraClient?
@@ -43,6 +46,11 @@ final class CameraFeed {
 
     private var hasViewers: Bool { surfaces.allObjects.contains { $0.isOnScreen } }
 
+    /// A print is under way: keep the stream warm even with nothing on screen.
+    private var keepsWarm: Bool { session?.status?.state.isActive == true && availability() == nil }
+
+    private var wanted: Bool { hasViewers || keepsWarm }
+
     // MARK: - Surfaces
 
     func attach(_ surface: CameraSurfaceView) {
@@ -59,17 +67,18 @@ final class CameraFeed {
         viewersChanged()
     }
 
-    /// A surface appeared or disappeared on screen.
+    /// A surface appeared or disappeared on screen, or a print started or ended.
     func viewersChanged() {
-        if hasViewers {
+        if wanted {
             idleStop?.invalidate()
             idleStop = nil
             if client == nil && retry == nil { connect() }
         } else if client != nil || retry != nil, idleStop == nil {
             idleStop = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.idleStop = nil
-                    self?.stop()
+                    guard let self else { return }
+                    self.idleStop = nil
+                    if !self.wanted { self.stop() }
                 }
             }
         }
@@ -77,28 +86,28 @@ final class CameraFeed {
 
     // MARK: - Lifecycle
 
-    /// Something the stream depends on changed (connection, Liveview setting): reconsider.
+    /// Something the stream depends on changed (connection, Liveview setting, print state): reconsider.
     func update() {
+        if let reason = availability() {
+            if client != nil || retry != nil { stop() }
+            state = .unavailable(reason)
+            return
+        }
         switch state {
-        case .unavailable, .failed:
-            guard hasViewers else { return }
+        case .unavailable, .failed(_, retrying: false):
             retry?.invalidate()
+            retry = nil
             attempt = 0
-            connect()
-        case .connecting, .live:
-            if let reason = availability() {
-                stop()
-                state = .unavailable(reason)
-            }
-        case .idle:
-            break
+            if wanted { connect() } else { state = .idle }
+        default:
+            viewersChanged()
         }
     }
 
     func tryAgain() {
         stop()
         attempt = 0
-        if hasViewers { connect() }
+        if wanted { connect() }
     }
 
     /// Reconnects if running, e.g. after the printer moved to a new address.
@@ -159,8 +168,9 @@ final class CameraFeed {
 
     private func handle(_ event: CameraEvent) {
         switch event {
-        case .started(let description):
+        case .started(let description, let size):
             detail = description
+            if size.width > 0 && size.height > 0 { aspectRatio = size.width / size.height }
         case .video(let sample, let keyframe):
             if keyframe {
                 sinceKeyframe = [sample]

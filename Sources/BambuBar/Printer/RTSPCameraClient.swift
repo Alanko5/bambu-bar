@@ -1,3 +1,4 @@
+import CoreMedia
 import CryptoKit
 import Foundation
 
@@ -216,7 +217,9 @@ final class RTSPCameraClient: CameraClient {
             if !started, let format = depacketizer.format {
                 started = true
                 log?("first keyframe: \(depacketizer.codec.rawValue) \(format.dimensionsText)")
-                deliver(.started("\(depacketizer.codec.rawValue) · \(format.dimensionsText)"))
+                let size = CMVideoFormatDescriptionGetDimensions(format)
+                deliver(.started("\(depacketizer.codec.rawValue) · \(format.dimensionsText)",
+                                 size: CGSize(width: Int(size.width), height: Int(size.height))))
             }
             deliver(.video(frame.sample, keyframe: frame.isKeyframe))
         }

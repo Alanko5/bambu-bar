@@ -98,7 +98,7 @@ final class JPEGCameraClient: CameraClient {
         lastFrame = Date()
         if frames == 1 {
             log?("first frame: \(image.width)×\(image.height), \(jpeg.count) bytes")
-            deliver(.started("JPEG · \(image.width)×\(image.height)"))
+            deliver(.started("JPEG · \(image.width)×\(image.height)", size: CGSize(width: image.width, height: image.height)))
         }
         deliver(.image(image))
     }

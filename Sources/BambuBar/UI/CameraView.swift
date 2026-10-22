@@ -183,6 +183,7 @@ struct CameraPlayer: View {
             Circle().fill(Palette.failed).frame(width: 6, height: 6)
             Text("LIVE").font(.system(size: compact ? 9 : 10, weight: .bold)).tracking(0.5)
         }
+        .fixedSize()
         .foregroundStyle(.white)
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
@@ -215,6 +216,30 @@ struct CameraPlayer: View {
 
 // MARK: - Placements
 
+/// Full width of whatever holds it, as tall as the picture's aspect ratio makes it. `aspectRatio(_:contentMode:)`
+/// sizes an AppKit-backed view from its (tiny) ideal size when the height is open, as in the menu bar panel.
+struct CameraFrame<Content: View>: View {
+    var ratio: CGFloat
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        WidthDrivenLayout(ratio: ratio) { content }
+    }
+}
+
+private struct WidthDrivenLayout: Layout {
+    var ratio: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? 480
+        return CGSize(width: width, height: (width / max(ratio, 0.1)).rounded())
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews { subview.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size)) }
+    }
+}
+
 /// The camera on the Printer page: a heading with the stream details, hide/show and pop-out buttons.
 struct CameraCard: View {
     var session: PrinterSession
@@ -232,9 +257,10 @@ struct CameraCard: View {
                     .font(.system(size: 11))
             }
             if shown {
-                CameraPlayer(session: session, cornerRadius: 18)
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .transition(.opacity)
+                CameraFrame(ratio: session.camera.aspectRatio) {
+                    CameraPlayer(session: session, cornerRadius: 18)
+                }
+                .transition(.opacity)
             }
         }
     }
@@ -270,9 +296,10 @@ struct CameraPreview: View {
             }
             .padding(.horizontal, 4)
             if expanded {
-                CameraPlayer(session: session, cornerRadius: 14, compact: true)
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                CameraFrame(ratio: session.camera.aspectRatio) {
+                    CameraPlayer(session: session, cornerRadius: 14, compact: true)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
@@ -301,11 +328,11 @@ enum CameraWindow {
         window.isReleasedWhenClosed = false
         window.backgroundColor = .black
         window.contentMinSize = NSSize(width: 320, height: 180)
-        window.contentAspectRatio = NSSize(width: 16, height: 9)
+        window.contentAspectRatio = NSSize(width: session.camera.aspectRatio, height: 1)
         window.contentViewController = NSHostingController(
             rootView: CameraWindowView(session: session)
                 .environment(PrinterStore.shared))
-        window.setContentSize(NSSize(width: 800, height: 450))
+        window.setContentSize(NSSize(width: 800, height: (800 / session.camera.aspectRatio).rounded()))
         window.center()
         window.setFrameAutosaveName("BambuBarCamera-\(session.id)")
         let serial = session.id
@@ -325,6 +352,14 @@ enum CameraWindow {
         window?.contentViewController = nil
         windows[serial] = nil
         if let observer = observers.removeValue(forKey: serial) { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    /// Matches the window's shape to the picture once the stream reports its size.
+    static func setAspectRatio(_ ratio: CGFloat, for serial: String) {
+        guard let window = windows[serial], let content = window.contentView else { return }
+        window.contentAspectRatio = NSSize(width: ratio, height: 1)
+        let width = content.frame.width
+        window.setContentSize(NSSize(width: width, height: (width / ratio).rounded()))
     }
 
     static func setFloating(_ floating: Bool, for serial: String) {
@@ -349,6 +384,7 @@ struct CameraWindowView: View {
         .ignoresSafeArea()
         .background(.black)
         .onHover { inside in withAnimation(.smooth(duration: 0.2)) { hovering = inside } }
+        .onChange(of: session.camera.aspectRatio) { _, ratio in CameraWindow.setAspectRatio(ratio, for: session.id) }
     }
 
     private var controls: some View {

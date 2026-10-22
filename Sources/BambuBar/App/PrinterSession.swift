@@ -176,6 +176,7 @@ final class PrinterSession: Identifiable {
         if phase == .online { fallbackCodes = [] }
         self.phase = phase
         onPhase?(self, phase)
+        camera.update()
     }
 
     private func received(_ new: PrinterStatus, canceled: Bool) {
@@ -186,5 +187,7 @@ final class PrinterSession: Identifiable {
         if let level = pendingSpeed, new.speed == level { pendingSpeed = nil }
         onStatus?(self, old, new, canceled)
         hasBaseline = true
+        // The camera stays on for the whole of a print.
+        if old?.state.isActive != new.state.isActive { camera.update() }
     }
 }

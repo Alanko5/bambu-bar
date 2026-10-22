@@ -61,8 +61,8 @@ enum CameraFailure: Error, Equatable {
 }
 
 enum CameraEvent {
-    /// The first frame is on its way; a short description of the stream ("H.264 · 1920×1080").
-    case started(String)
+    /// The first frame is on its way: a short description of the stream ("H.264 · 1920×1080") and its picture size.
+    case started(String, size: CGSize)
     /// A compressed video frame for `AVSampleBufferDisplayLayer`.
     case video(CMSampleBuffer, keyframe: Bool)
     /// A decoded still (the JPEG stream).

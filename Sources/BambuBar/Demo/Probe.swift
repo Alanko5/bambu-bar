@@ -82,7 +82,7 @@ enum Probe {
         client.log = { line in DispatchQueue.main.async { log(line) } }
         client.onEvent = { event in
             switch event {
-            case .started(let description):
+            case .started(let description, _):
                 log("stream: \(description)")
             case .video(let sample, let keyframe):
                 frames += 1
