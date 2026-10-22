@@ -28,6 +28,7 @@ It talks to the printer directly over your network, the same way Bambu Studio do
 | --- | --- |
 | **Menu bar** | A printer glyph that fills as the print grows, with progress and time left beside it (or just one, or only the icon), and a pause or alert mark when the printer needs you. |
 | **Panel** | The job, its stage ("Heating hotend", "Paused: filament ran out"), percentage, layers, time left and finish time; nozzle, bed and chamber temperatures; AMS spools with what's left and the humidity; printer errors in plain English. |
+| **Camera** | The printer's live view on the Printer page, in a collapsible preview in the panel, and in its own resizable window that can stay on top. It streams only while it's on screen. X1, H2, P2S and X2D use RTSPS (turn on **LAN Only Liveview** on the printer); P1 and A1 use their JPEG stream. |
 | **Controls** | Pause, resume, stop (with a confirmation), print speed (Silent, Standard, Sport, Ludicrous) and a chamber light switch. |
 | **Drawn to match** | Each printer is drawn as its model, with the part growing in the colour of the filament in use: the P2S/P1S/X1 enclosure, the wider dual-nozzle H2, the open P1P frame, the A1's arch with its AMS Lite, the A1 mini. |
 | **Window** | A larger view plus fans, nozzle, door, network, storage and firmware; a Filament page with every spool; a Widgets page that tours every widget size and state. |
@@ -84,7 +85,7 @@ The widget shows what the app last saw, so keep Bambu Bar running (Open at Login
 | **P2S** | Development printer; verified with firmware **01.03.00.00** and an AMS 2 Pro. |
 | **X1, P1, A1, H2 families** | Same LAN protocol and certificate authorities; implemented, not verified on hardware. |
 
-The printer can be in cloud mode or LAN Only mode; controls need LAN Only with Developer Mode (see above). The camera is not shown.
+The printer can be in cloud mode or LAN Only mode; controls need LAN Only with Developer Mode (see above). The camera on X1, H2, P2S and X2D printers needs **LAN Only Liveview** turned on in the printer's network settings.
 
 If you try another model, [open an issue](https://github.com/rolottr/bambu-bar/issues) with the model, firmware, macOS version and what worked. Run `--probe` (below) for a report; remove the serial number and access code before posting it.
 
@@ -139,6 +140,7 @@ The [GitHub Actions workflow](.github/workflows/build.yml) builds and uploads an
 - `scripts/emulator/printer.py` runs a pretend P2S on `127.0.0.1:8883` (needs `brew install mosquitto`): a TLS MQTT broker that replays a real P2S report, then prints, heats and obeys pause, resume, stop, speed and light. Connect with
   `"build/App.noindex/Bambu Bar.app/Contents/MacOS/Bambu Bar" --connect 127.0.0.1 22E00EMULATOR0 12345678 --insecure-tls`
 - `--probe <ip> <serial> <access-code>` connects to a real printer from Terminal and prints what it reports.
+- `--probe-camera <ip> <serial> <access-code> [seconds] [--model P1S | --jpeg | --rtsp]` opens the camera from Terminal, logs the handshake (certificate, RTSP replies, SDP) and frame rate, and saves the first decoded frame to `$TMPDIR/bambubar-camera.png`. It assumes RTSPS (a P2S) unless told otherwise.
 - `scripts/showcase.sh <dir>` screenshots the panel, window and widgets in each demo state; `scripts/make-readme-animations.sh` renders the animations above, offscreen, from the demo printer.
 - `scripts/make-hms.py` regenerates the bundled error texts.
 
@@ -149,6 +151,7 @@ The [GitHub Actions workflow](.github/workflows/build.yml) builds and uploads an
 | `⌘1` – `⌘5` | Printer, Filament, Widgets, Settings, About. |
 | `⌘R` | Ask the printer for a full report. |
 | `⌘L` | Turn the chamber light on or off. |
+| `⌘K` | Open the camera window. |
 | `⌘,` | Settings. |
 
 The **Printer** menu also switches printers, adds one, and pauses, resumes or stops the print.
