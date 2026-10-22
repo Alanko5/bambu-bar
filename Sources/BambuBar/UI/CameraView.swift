@@ -249,7 +249,7 @@ struct CameraCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 SectionLabel("Camera", trailing: shown ? session.camera.detail : nil)
-                Button { CameraWindow.show(session) } label: { Image(systemName: "arrow.up.forward.app") }
+                Button { CameraWindow.show(session) } label: { Image(systemName: "pip.enter") }
                     .buttonStyle(.borderless)
                     .help("Open the camera in its own window")
                 Button(shown ? "Hide" : "Show") { withAnimation(.smooth(duration: 0.25)) { shown.toggle() } }
@@ -288,7 +288,7 @@ struct CameraPreview: View {
                 }
                 .buttonStyle(.plain)
                 .help(expanded ? "Hide the camera" : "Show the camera")
-                Button { CameraWindow.show(session) } label: { Image(systemName: "arrow.up.forward.app") }
+                Button { CameraWindow.show(session) } label: { Image(systemName: "pip.enter") }
                     .buttonStyle(.borderless)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
