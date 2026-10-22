@@ -28,7 +28,7 @@ It talks to the printer directly over your network, the same way Bambu Studio do
 | --- | --- |
 | **Menu bar** | A printer glyph that fills as the print grows, with progress and time left beside it (or just one, or only the icon), and a pause or alert mark when the printer needs you. |
 | **Panel** | The job, its stage ("Heating hotend", "Paused: filament ran out"), percentage, layers, time left and finish time; nozzle, bed and chamber temperatures; AMS spools with what's left and the humidity; printer errors in plain English. |
-| **Camera** | The printer's live view on the Printer page, in a collapsible preview in the panel, and in its own resizable window that can stay on top. It streams only while it's on screen. X1, H2, P2S and X2D use RTSPS (turn on **LAN Only Liveview** on the printer); P1 and A1 use their JPEG stream. |
+| **Camera** | The printer's live view on the Printer page, in a collapsible preview in the panel, and in its own resizable window that can stay on top. It streams only while it's on screen, unless you choose in Settings to keep it connected during prints so it shows at once. X1, H2, P2S and X2D use RTSPS (turn on **LAN Only Liveview** on the printer); P1 and A1 use their JPEG stream. |
 | **Controls** | Pause, resume, stop (with a confirmation), print speed (Silent, Standard, Sport, Ludicrous) and a chamber light switch. |
 | **Drawn to match** | Each printer is drawn as its model, with the part growing in the colour of the filament in use: the P2S/P1S/X1 enclosure, the wider dual-nozzle H2, the open P1P frame, the A1's arch with its AMS Lite, the A1 mini. |
 | **Window** | A larger view plus fans, nozzle, door, network, storage and firmware; a Filament page with every spool; a Widgets page that tours every widget size and state. |
@@ -117,6 +117,8 @@ cd bambu-bar
 ```
 
 `build.sh` generates the Xcode project from `project.yml`, builds the app and its widget extension, and signs both with the first **Developer ID Application** identity in your keychain (override with `SIGN_IDENTITY=…`; set `TEAM_ID` to match its team, which names the app group the widget shares). Without one the app is signed ad hoc and works without the widget. `CONFIG=Debug` and `ARCHS=arm64` are available. Builds go into a `.noindex` folder so Spotlight and Launchpad only ever find the installed copy.
+
+`./scripts/test.sh` runs the unit tests, which cover the camera's protocol parsing (RTSP, SDP, Digest sign-in, H.264/H.265 packets and the JPEG stream) with recorded bytes.
 
 ### Package and notarize a release
 
