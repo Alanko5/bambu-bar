@@ -141,6 +141,13 @@ struct SettingsPage: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            group("Camera", symbol: "video.fill") {
+                toggle("Keep the camera connected during prints", isOn: $store.cameraStaysOnWhilePrinting)
+                Text("The picture shows at once when you open it, but the stream runs for the whole print and uses one of the printer's few camera connections, so Bambu Handy or Bambu Studio may not get the camera meanwhile.")
+                    .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             group("Desktop widget", symbol: "widget.small") {
                 HStack {
                     Text("See what each widget size shows, your printers as widgets, and how to add one.")

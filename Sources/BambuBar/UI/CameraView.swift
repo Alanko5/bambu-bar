@@ -8,6 +8,8 @@ import SwiftUI
 /// It tells its feed when it comes and goes on screen, so a closed window or panel stops the stream.
 final class CameraSurfaceView: NSView {
     weak var feed: CameraFeed?
+    /// Missed frames while off screen; the feed catches it up when it's back.
+    var isBehind = false
     private let videoLayer = AVSampleBufferDisplayLayer()
     private let imageLayer = CALayer()
     private var needsKeyframe = true
@@ -63,6 +65,13 @@ final class CameraSurfaceView: NSView {
         }
         if imageLayer.contents != nil { imageLayer.contents = nil }
         renderer.enqueue(sample)
+    }
+
+    /// Starts decoding afresh from `samples`, which begin with a keyframe. Keeps the picture shown until then.
+    func restart(from samples: [CMSampleBuffer]) {
+        videoLayer.sampleBufferRenderer.flush()
+        needsKeyframe = true
+        for (index, sample) in samples.enumerated() { show(sample, keyframe: index == 0) }
     }
 
     func show(_ image: CGImage) {
