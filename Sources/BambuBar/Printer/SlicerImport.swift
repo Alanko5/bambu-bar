@@ -49,7 +49,7 @@ enum SlicerImport {
         var found: [SlicerPrinter] = []
         for (folder, title) in knownApps {
             let url = supportFolder.appendingPathComponent(folder).appendingPathComponent("\(folder).conf")
-            let source = suffix.map { "\(title) on \($0)" } ?? title
+            let source = suffix.map { String(localized: "\(title) on \($0)", comment: "Slicer app, then a user name or a disk") } ?? title
             for printer in read(url, source: source) where !found.contains(where: { $0.serial == printer.serial }) {
                 found.append(printer)
             }
@@ -64,7 +64,7 @@ enum SlicerImport {
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { return [] }
         guard isFolder.boolValue else {
             let source = url.lastPathComponent.lowercased().hasPrefix("orca") ? "OrcaSlicer" : "Bambu Studio"
-            return read(url, source: "\(source) settings file")
+            return read(url, source: String(localized: "\(source) settings file", comment: "Bambu Studio or OrcaSlicer"))
         }
         let candidates = [url, url.appendingPathComponent("Library/Application Support")]
             + knownApps.map { url.appendingPathComponent($0.0) }

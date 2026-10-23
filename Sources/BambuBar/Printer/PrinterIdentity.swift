@@ -12,10 +12,10 @@ enum PrinterIdentity {
 
         var message: String {
             switch self {
-            case .notBambu(let reason): return "That address didn't answer as a Bambu Lab printer: \(reason)"
-            case .unreachable(let reason): return "\(reason) Check the IP address on the printer's screen (Settings → Network)."
+            case .notBambu(let reason): return String(localized: "That address didn't answer as a Bambu Lab printer: \(reason)")
+            case .unreachable(let reason): return String(localized: "\(reason) Check the IP address on the printer's screen (Settings → Network).", comment: "A sentence on why the printer couldn't be reached comes first")
             case .localNetworkDenied: return LocalNetwork.advice
-            case .timedOut: return "Nothing answered at that address. Check the IP address on the printer's screen (Settings → Network)."
+            case .timedOut: return String(localized: "Nothing answered at that address. Check the IP address on the printer's screen (Settings → Network).")
             }
         }
     }
@@ -64,7 +64,7 @@ enum PrinterIdentity {
                 if case .genuine(let name?) = identity, !name.isEmpty {
                     finish(.success(name.uppercased()))
                 } else {
-                    finish(.failure(.notBambu("its certificate doesn't name it.")))
+                    finish(.failure(.notBambu(String(localized: "its certificate doesn't name it.", comment: "After “That address didn't answer as a Bambu Lab printer:”"))))
                 }
             case .waiting(let error), .failed(let error):
                 if connection?.currentPath?.unsatisfiedReason == .localNetworkDenied {

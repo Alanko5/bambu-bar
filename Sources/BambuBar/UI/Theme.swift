@@ -30,17 +30,23 @@ extension View {
 
 /// Small uppercase heading above a group.
 struct SectionLabel: View {
-    var title: String
+    var title: Text
     var trailing: String?
 
-    init(_ title: String, trailing: String? = nil) {
-        self.title = title
+    init(_ title: LocalizedStringKey, trailing: String? = nil) {
+        self.title = Text(title)
+        self.trailing = trailing
+    }
+
+    init(verbatim title: String, trailing: String? = nil) {
+        self.title = Text(verbatim: title)
         self.trailing = trailing
     }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title.uppercased())
+            title
+                .textCase(.uppercase)
                 .font(.system(size: 10.5, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
@@ -93,7 +99,7 @@ struct TemperatureTiles: View {
 /// in small type ("164° → 220°"); once there, or with the heater off, only the reading shows.
 struct TemperatureTile: View {
     var fillsHeight = false
-    var title: String
+    var title: LocalizedStringKey
     var symbol: String
     var temperature: Temperature?
     var plain: Double? = nil
@@ -133,8 +139,18 @@ struct TemperatureTile: View {
         .frame(maxHeight: fillsHeight ? .infinity : nil, alignment: .topLeading)
         .panel(radius: 14, padding: 11)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title)\(inUse ? ", in use" : "") \(current.map { "\(Int($0)) degrees" } ?? "unknown")"
-                            + (changing ? ", \(temperature!.current < temperature!.target ? "heating" : "cooling") to \(Int(temperature!.target))" : ""))
+        .accessibilityLabel(Text("\(Text(title)), \(accessibilityValue)", comment: "VoiceOver: tile name, then its reading"))
+    }
+
+    private var accessibilityValue: Text {
+        let current = temperature?.current ?? plain
+        var parts: [String] = []
+        if inUse { parts.append(String(localized: "in use", comment: "A nozzle that is printing, read by VoiceOver")) }
+        parts.append(current.map { String(localized: "\(Int($0)) degrees") } ?? String(localized: "unknown", comment: "Temperature not reported yet"))
+        if changing, let t = temperature {
+            parts.append(t.current < t.target ? String(localized: "heating to \(Int(t.target))") : String(localized: "cooling to \(Int(t.target))"))
+        }
+        return Text(verbatim: parts.joined(separator: ", "))
     }
 
     private var heating: Bool { (temperature?.target ?? 0) > 0 }
@@ -183,7 +199,7 @@ private struct ControlButtonBody: View {
 
 /// A row of label/value pairs for detail sections.
 struct DetailRow: View {
-    var title: String
+    var title: LocalizedStringKey
     var value: String
     var symbol: String?
 
@@ -245,12 +261,12 @@ struct RefreshControl: View {
     }
 
     private func label(now: Date) -> String {
-        if spinning { return "Refreshing…" }
+        if spinning { return String(localized: "Refreshing…") }
         guard let heard = store.current?.lastHeard, store.isOnline else { return store.linkSummary }
         let seconds = Int(now.timeIntervalSince(heard))
-        if seconds < 3 { return "Updated just now" }
-        if seconds < 60 { return "Updated \(seconds)s ago" }
-        return "Updated " + relativeTime(heard)
+        if seconds < 3 { return String(localized: "Updated just now") }
+        if seconds < 60 { return String(localized: "Updated \(seconds)s ago", comment: "Seconds since the last report, short") }
+        return String(localized: "Updated \(relativeTime(heard))", comment: "Relative time such as “3 min. ago”")
     }
 
     private func refresh() {

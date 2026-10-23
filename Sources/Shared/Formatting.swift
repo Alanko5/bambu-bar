@@ -3,11 +3,11 @@ import SwiftUI
 enum Format {
     /// "2h 05m", "45m", "<1m".
     static func duration(minutes: Int) -> String {
-        if minutes <= 0 { return "<1m" }
+        if minutes <= 0 { return String(localized: "<1m", comment: "Less than a minute, short") }
         let h = minutes / 60, m = minutes % 60
-        if h == 0 { return "\(m)m" }
-        if h >= 24 { return "\(h / 24)d \(h % 24)h" }
-        return String(format: "%dh %02dm", h, m)
+        if h == 0 { return String(localized: "\(m)m", comment: "Minutes, short") }
+        if h >= 24 { return String(localized: "\(h / 24)d \(h % 24)h", comment: "Days and hours, short") }
+        return String(localized: "\(h)h \(String(format: "%02d", m))m", comment: "Hours and two-digit minutes, short")
     }
 
     static func duration(seconds: TimeInterval) -> String {
@@ -20,7 +20,7 @@ enum Format {
         let cal = Calendar.current
         if cal.isDate(date, inSameDayAs: now) { return time }
         if let tomorrow = cal.date(byAdding: .day, value: 1, to: now), cal.isDate(date, inSameDayAs: tomorrow) {
-            return "tomorrow \(time)"
+            return String(localized: "tomorrow \(time)", comment: "Finish time, such as “tomorrow 08:10”")
         }
         return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
@@ -29,8 +29,10 @@ enum Format {
 
     /// "≈ 810 g", "1 kg"; `approximate` for measured amounts (the AMS estimates what's left).
     static func grams(_ value: Int, approximate: Bool = true) -> String {
-        let text = value >= 1000 && value % 1000 == 0 ? "\(value / 1000) kg"
-            : value >= 1000 ? String(format: "%.2f kg", Double(value) / 1000) : "\(value) g"
+        let text = value >= 1000
+            ? Measurement(value: Double(value) / 1000, unit: UnitMass.kilograms)
+                .formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0...2))))
+            : Measurement(value: Double(value), unit: UnitMass.grams).formatted(.measurement(width: .abbreviated, usage: .asProvided))
         return approximate ? "≈\u{2009}" + text : text
     }
 }

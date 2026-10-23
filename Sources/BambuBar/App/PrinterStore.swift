@@ -8,10 +8,10 @@ enum MenuBarStyle: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .icon: return "Icon only"
-        case .percent: return "Progress"
-        case .remaining: return "Time left"
-        case .both: return "Progress and time left"
+        case .icon: return String(localized: "Icon only", comment: "Menu bar style")
+        case .percent: return String(localized: "Progress", comment: "Menu bar style")
+        case .remaining: return String(localized: "Time left", comment: "Menu bar style")
+        case .both: return String(localized: "Progress and time left", comment: "Menu bar style")
         }
     }
 }
@@ -299,7 +299,7 @@ final class PrinterStore {
         let seen = discovered.first { $0.serial == printer.serial }
         if let name = seen?.name, !name.isEmpty, name != printer.serial { return name }
         let model = PrinterModel.find(code: seen?.modelCode ?? "", serial: printer.serial)
-        return "\(model?.name ?? "Printer") \(printer.serial.suffix(3))"
+        return "\(model?.name ?? String(localized: "Printer")) \(printer.serial.suffix(3))"
     }
 
     /// The name the printer announces on the network (set in Bambu Handy or Bambu Studio), when it has been seen.
@@ -420,11 +420,11 @@ final class PrinterStore {
     var phase: PrinterConnection.Phase { current?.phase ?? .idle }
     var status: PrinterStatus? { current?.status }
     var isOnline: Bool { current?.isOnline ?? false }
-    var printerName: String { current?.config.name ?? "Printer" }
+    var printerName: String { current?.config.name ?? String(localized: "Printer") }
     var chamberLightOn: Bool { current?.chamberLightOn ?? false }
     var speed: SpeedLevel { current?.speed ?? .standard }
     var accessCode: String? { current?.accessCode }
-    var linkSummary: String { current?.linkSummary ?? "No printer set up" }
+    var linkSummary: String { current?.linkSummary ?? String(localized: "No printer set up") }
     var linkDetail: String? { current?.linkDetail }
 
     /// The current printer's most recent print (for "Last: …" and "finished 3h ago").
@@ -454,17 +454,18 @@ final class PrinterStore {
         if confirmStop {
             let job = current.status?.jobName ?? ""
             let alert = NSAlert()
-            alert.messageText = "Stop “\(job.isEmpty ? "this print" : job)”?"
-            alert.informativeText = (hasMultiplePrinters ? "On \(current.config.name). " : "") + "The print can't be resumed after it's stopped."
+            alert.messageText = job.isEmpty ? String(localized: "Stop this print?") : String(localized: "Stop “\(job)”?")
+            let warning = String(localized: "The print can't be resumed after it's stopped.")
+            alert.informativeText = hasMultiplePrinters ? String(localized: "On \(current.config.name).", comment: "Which printer") + " " + warning : warning
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Stop Print")
-            alert.addButton(withTitle: "Keep Printing")
+            alert.addButton(withTitle: String(localized: "Stop Print"))
+            alert.addButton(withTitle: String(localized: "Keep Printing"))
             alert.buttons.first?.hasDestructiveAction = true
             NSApp.activate(ignoringOtherApps: true)
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         current.stopPrint()
-        showToast("Stopping…")
+        showToast(String(localized: "Stopping…"))
     }
 
     func toggleLight() { current?.toggleLight() }
@@ -477,7 +478,7 @@ final class PrinterStore {
     /// Print commands need the printer in Developer Mode; say so instead of sending something it will refuse.
     private func ensureControllable(_ session: PrinterSession) -> Bool {
         if session.status?.controlsLocked == true {
-            showToast("Turn on LAN Only and Developer Mode on the printer to control prints from Bambu Bar.", error: true)
+            showToast(String(localized: "Turn on LAN Only and Developer Mode on the printer to control prints from Bambu Bar."), error: true)
             return false
         }
         return true
@@ -486,8 +487,8 @@ final class PrinterStore {
     private func acknowledged(_ session: PrinterSession, ok: Bool, reason: String?) {
         guard !ok else { return }
         let detail = (reason ?? "").lowercased().contains("verify")
-            ? "The printer only accepts commands in Developer Mode."
-            : (reason.map { "The printer refused: \($0)" } ?? "The printer refused the command.")
+            ? String(localized: "The printer only accepts commands in Developer Mode.")
+            : (reason.map { String(localized: "The printer refused: \($0)", comment: "The printer's reason, in English") } ?? String(localized: "The printer refused the command."))
         showToast(hasMultiplePrinters ? "\(session.config.name): \(detail)" : detail, error: true)
     }
 
@@ -507,7 +508,7 @@ final class PrinterStore {
         let serial = session.id
         // Simulated printers never post real notifications.
         let notify = session.hasBaseline && !isDemo
-        let name = new.jobName.isEmpty ? "Untitled print" : new.jobName
+        let name = new.jobName.isEmpty ? String(localized: "Untitled print") : new.jobName
         let spool = new.activeSpool
         // Notification titles name the printer once there's more than one.
         let prefix = hasMultiplePrinters ? "\(session.config.name): " : ""
@@ -531,7 +532,7 @@ final class PrinterStore {
                 HistoryStore.save(history)
             }
             if notify, old != nil, notifyStarted {
-                notifier.post(title: prefix + "Print started", body: name, id: "start.\(serial)")
+                notifier.post(title: prefix + String(localized: "Print started"), body: name, id: "start.\(serial)")
             }
         }
         if let index = history.firstIndex(where: { $0.printerSerial == serial && $0.outcome == .running }) {
@@ -556,7 +557,7 @@ final class PrinterStore {
             }
         }
         if notify, let old, old.state == .printing || old.state == .preparing, new.state == .paused, notifyPaused {
-            notifier.post(title: prefix + "Print paused", body: "\(name): \(new.detailText)", id: "pause.\(serial)")
+            notifier.post(title: prefix + String(localized: "Print paused"), body: "\(name): \(new.detailText)", id: "pause.\(serial)")
         }
         if notify, let old {
             let fresh = new.issues.filter { issue in issue.severity <= .serious && !old.issues.contains { $0.id == issue.id } }
@@ -567,14 +568,17 @@ final class PrinterStore {
     }
 
     private func notifyEnd(_ job: JobRecord, status: PrinterStatus, prefix: String, serial: String) {
-        let duration = job.duration.map { " in \(Format.duration(seconds: $0))" } ?? ""
         switch job.outcome {
         case .finished where notifyFinished:
-            notifier.post(title: prefix + "Print finished", body: "\(job.name) finished\(duration). It's ready to take off the plate.", id: "end.\(serial)")
+            let body = job.duration.map {
+                String(localized: "\(job.name) finished in \(Format.duration(seconds: $0)). It's ready to take off the plate.", comment: "Job name, then how long it took")
+            } ?? String(localized: "\(job.name) finished. It's ready to take off the plate.")
+            notifier.post(title: prefix + String(localized: "Print finished"), body: body, id: "end.\(serial)")
         case .failed where notifyFailed:
-            notifier.post(title: prefix + "Print failed", body: "\(job.name): \(status.issues.first?.message ?? "the printer stopped the job.")", id: "end.\(serial)")
+            let reason = status.issues.first?.message ?? String(localized: "the printer stopped the job.", comment: "After the job name and a colon")
+            notifier.post(title: prefix + String(localized: "Print failed"), body: "\(job.name): \(reason)", id: "end.\(serial)")
         case .canceled where notifyFailed:
-            notifier.post(title: prefix + "Print canceled", body: job.name, id: "end.\(serial)")
+            notifier.post(title: prefix + String(localized: "Print canceled"), body: job.name, id: "end.\(serial)")
         default:
             break
         }

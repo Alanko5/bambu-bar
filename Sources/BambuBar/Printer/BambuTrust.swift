@@ -51,7 +51,7 @@ enum BambuTrust {
             return .rejected(reason)
         case .genuine(let name):
             guard let name, name.caseInsensitiveCompare(serial) == .orderedSame else {
-                return .rejected("The certificate belongs to another device (\(name ?? "unnamed")).")
+                return .rejected(String(localized: "The certificate belongs to another device (\(name ?? String(localized: "unnamed"))).", comment: "The name in the certificate"))
             }
             return .trusted
         }
@@ -70,10 +70,10 @@ enum BambuTrust {
         SecTrustSetAnchorCertificatesOnly(trust, true)
         var error: CFError?
         guard SecTrustEvaluateWithError(trust, &error) else {
-            return .rejected((error as Error?)?.localizedDescription ?? "The certificate isn't from Bambu Lab.")
+            return .rejected((error as Error?)?.localizedDescription ?? String(localized: "The certificate isn't from Bambu Lab."))
         }
         guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], !chain.isEmpty else {
-            return .rejected("The printer sent no certificate.")
+            return .rejected(String(localized: "The printer sent no certificate."))
         }
         return .genuine(name: commonName(trust))
     }

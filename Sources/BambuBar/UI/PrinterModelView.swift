@@ -20,7 +20,7 @@ struct PrinterModelView: View {
                 .opacity(art.dimmed ? 0.6 : 1)
                 .accessibilityElement()
                 .accessibilityLabel("Printer model")
-                .accessibilityValue(art.state.title + (art.state.isActive ? ", \(Int(art.progress * 100)) percent" : ""))
+                .accessibilityValue(art.state.isActive ? String(localized: "\(art.state.title) \(Int(art.progress * 100)) percent", comment: "VoiceOver: state, then progress") : art.state.title)
         }
     }
 }

@@ -25,21 +25,21 @@ struct MenuBarLabel: View {
         let left = s.remainingMinutes > 0 ? Format.duration(minutes: s.remainingMinutes) : nil
         switch store.menuBarStyle {
         case .icon: return nil
-        case .percent: return s.state == .paused ? "Paused" : pct
-        case .remaining: return s.state == .paused ? "Paused" : (left ?? pct)
+        case .percent: return s.state == .paused ? s.state.title : pct
+        case .remaining: return s.state == .paused ? s.state.title : (left ?? pct)
         case .both:
-            if s.state == .paused { return "\(pct) · Paused" }
-            if s.state == .preparing { return s.progress > 0 ? pct : "Preparing" }
+            if s.state == .paused { return "\(pct) · \(s.state.title)" }
+            if s.state == .preparing { return s.progress > 0 ? pct : s.state.title }
             return left.map { "\(pct) · \($0)" } ?? pct
         }
     }
 
     private func accessibilityText(_ session: PrinterSession?) -> String {
         guard let session, let s = session.status, session.isOnline else {
-            return "Bambu Bar, \(session?.linkSummary ?? "no printer set up")"
+            return "Bambu Bar, \(session?.linkSummary ?? String(localized: "No printer set up"))"
         }
         let name = store.hasMultiplePrinters ? "\(session.config.name), " : ""
-        if s.state.isActive { return "Bambu Bar, \(name)\(s.state.title) \(s.progress) percent" }
+        if s.state.isActive { return "Bambu Bar, \(name)" + String(localized: "\(s.state.title) \(s.progress) percent", comment: "VoiceOver: state, then progress") }
         return "Bambu Bar, \(name)\(s.stateTitle)"
     }
 }

@@ -139,10 +139,10 @@ struct MenuPanel: View {
     }
 
     private var linkLine: String {
-        guard let config = store.config else { return "No printer set up" }
+        guard let config = store.config else { return String(localized: "No printer set up") }
         var parts = [config.modelName]
         if store.phase == .online {
-            if let wifi = store.status?.wifiSignal { parts.append(WiFi.describe(wifi)) } else { parts.append("Connected") }
+            if let wifi = store.status?.wifiSignal { parts.append(WiFi.describe(wifi)) } else { parts.append(String(localized: "Connected")) }
         } else {
             parts.append(store.linkSummary)
         }
@@ -212,8 +212,8 @@ struct JobHero: View {
     }
 
     private var pillText: String? {
-        if status.state == .printing, status.speed != .standard { return "Printing · \(status.speed.title)" }
-        if status.state == .idle, status.doorOpen == true { return "Ready · Door open" }
+        if status.state == .printing, status.speed != .standard { return "\(status.state.title) · \(status.speed.title)" }
+        if status.state == .idle, status.doorOpen == true { return String(localized: "\(status.state.title) · Door open", comment: "Printer state, then the door") }
         return nil
     }
 
@@ -221,13 +221,14 @@ struct JobHero: View {
     private var subtitle: String {
         if status.state == .printing, status.stageID == nil || status.stageID == 0 {
             if let spool = status.activeSpool, spool.isLoaded { return "\(spool.displayName) · \(spool.label)" }
-            return status.speed == .standard ? "Printing" : "\(status.speed.title) speed"
+            return status.speed == .standard ? status.state.title : String(localized: "\(status.speed.title) speed", comment: "Speed profile, such as “Sport speed”")
         }
         if status.state == .finished, let job = store.lastJob, job.outcome == .finished, let end = job.endedAt {
-            return "Finished \(relativeTime(end))" + (job.duration.map { " · took \(Format.duration(seconds: $0))" } ?? "")
+            let finished = String(localized: "Finished \(relativeTime(end))", comment: "Relative time such as “5 min. ago”")
+            return finished + (job.duration.map { " · " + String(localized: "took \(Format.duration(seconds: $0))", comment: "How long the print took") } ?? "")
         }
         if status.state == .failed {
-            return status.totalLayers > 0 ? "Stopped at layer \(status.layer) of \(status.totalLayers)" : "Stopped"
+            return status.totalLayers > 0 ? String(localized: "Stopped at layer \(status.layer) of \(status.totalLayers)") : String(localized: "Stopped")
         }
         return status.detailText
     }
@@ -246,7 +247,7 @@ struct JobHero: View {
     @ViewBuilder
     private var jobBody: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(status.jobName.isEmpty ? "Untitled print" : status.jobName)
+            Text(status.jobName.isEmpty ? String(localized: "Untitled print") : status.jobName)
                 .font(.system(size: compact ? 14 : 20, weight: .semibold))
                 .lineLimit(compact ? 1 : 2)
                 .truncationMode(.middle)
@@ -313,7 +314,7 @@ struct JobHero: View {
                 Label(status.issues.isEmpty ? "Clear the plate to print again" : "Needs attention", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(Palette.failed)
             } else if let end = status.estimatedEnd {
-                Label(Format.duration(minutes: status.remainingMinutes) + " left", systemImage: "clock")
+                Label("\(Format.duration(minutes: status.remainingMinutes)) left", systemImage: "clock")
                 Spacer(minLength: 4)
                 if status.state != .paused {
                     Text("Done \(Format.finish(end))").foregroundStyle(.secondary)
@@ -416,7 +417,7 @@ struct FilamentStrip: View {
         VStack(alignment: .leading, spacing: 9) {
             ForEach(status.ams) { unit in
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionLabel(unit.title, trailing: climate(unit))
+                    SectionLabel(verbatim: unit.title, trailing: climate(unit))
                     HStack(spacing: 0) {
                         ForEach(unit.spools) { spool in
                             spoolColumn(spool)
@@ -438,8 +439,8 @@ struct FilamentStrip: View {
 
     private func climate(_ unit: AMSUnit) -> String? {
         var parts: [String] = []
-        if unit.dryingMinutesLeft > 0 { parts.append("Drying · \(Format.duration(minutes: unit.dryingMinutesLeft))") }
-        if let h = unit.humidity { parts.append("\(h)% RH") } else if let level = unit.humidityLevel { parts.append("Humidity \(level)/5") }
+        if unit.dryingMinutesLeft > 0 { parts.append(String(localized: "Drying · \(Format.duration(minutes: unit.dryingMinutesLeft))", comment: "AMS drying, then the time left")) }
+        if let h = unit.humidity { parts.append(String(localized: "\(h)% RH", comment: "Relative humidity")) } else if let level = unit.humidityLevel { parts.append(String(localized: "Humidity \(level)/5")) }
         if let t = unit.temperature { parts.append(Format.temperature(t)) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -459,15 +460,15 @@ struct FilamentStrip: View {
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(spool.isLoaded ? .primary : .tertiary)
                 .lineLimit(1)
-            Text(spool.isLoaded ? spool.amountText : "Empty")
+            Text(spool.amountText)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity)
-        .help(!spool.isLoaded ? "\(spool.label): empty"
+        .help(!spool.isLoaded ? String(localized: "\(spool.label): empty", comment: "AMS slot such as A1")
               : "\(spool.label): " + [[spool.brand, spool.displayName].compactMap { $0 }.joined(separator: " "),
-                                     spool.colorName, spool.remain == nil ? nil : "\(spool.remainDetail) left"]
+                                     spool.colorName, spool.remain == nil ? nil : String(localized: "\(spool.remainDetail) left", comment: "Filament left, such as “81% · ≈ 810 g left”")]
                 .compactMap { $0 }.joined(separator: ", "))
     }
 }
@@ -481,7 +482,7 @@ struct PrintControls: View {
     /// The printer only takes print commands in LAN Only mode with Developer Mode on.
     private var locked: Bool { status.controlsLocked }
     private var lockedHelp: String? {
-        locked ? "The printer accepts this only in LAN Only mode with Developer Mode on (Settings → Network on its screen)." : nil
+        locked ? String(localized: "The printer accepts this only in LAN Only mode with Developer Mode on (Settings → Network on its screen).") : nil
     }
 
     var body: some View {
@@ -489,16 +490,16 @@ struct PrintControls: View {
             if status.state == .paused {
                 Button { store.resume() } label: { Label("Resume", systemImage: locked ? "lock.fill" : "play.fill") }
                     .buttonStyle(ControlButtonStyle(tint: Palette.accentDeep, prominent: true))
-                    .help(lockedHelp ?? "Resume the print")
+                    .help(lockedHelp ?? String(localized: "Resume the print"))
             } else if status.state.isActive {
                 Button { store.pause() } label: { Label("Pause", systemImage: locked ? "lock.fill" : "pause.fill") }
                     .buttonStyle(ControlButtonStyle())
-                    .help(lockedHelp ?? "Pause the print")
+                    .help(lockedHelp ?? String(localized: "Pause the print"))
             }
             if status.state.isActive {
                 Button { store.stopPrint() } label: { Label("Stop", systemImage: locked ? "lock.fill" : "stop.fill") }
                     .buttonStyle(ControlButtonStyle(tint: Palette.failed))
-                    .help(lockedHelp ?? "Stop the print")
+                    .help(lockedHelp ?? String(localized: "Stop the print"))
             }
             if status.state.isActive {
                 Menu {
@@ -533,7 +534,7 @@ struct ConnectionCard: View {
                 .frame(width: 70, height: 84)
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.system(size: 15, weight: .semibold))
-                Text(store.linkDetail ?? "Bambu Bar keeps trying in the background.")
+                Text(store.linkDetail ?? String(localized: "Bambu Bar keeps trying in the background."))
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -564,11 +565,11 @@ struct ConnectionCard: View {
 
     private var title: String {
         switch store.phase {
-        case .connecting: return "Connecting to \(store.printerName)…"
-        case .unauthorized: return "Access code rejected"
-        case .certificate: return "Can't verify the printer"
-        case .localNetworkDenied: return "Bambu Bar can't reach your network"
-        default: return "\(store.printerName) is offline"
+        case .connecting: return String(localized: "Connecting to \(store.printerName)…")
+        case .unauthorized: return String(localized: "Access code rejected")
+        case .certificate: return String(localized: "Can't verify the printer")
+        case .localNetworkDenied: return String(localized: "Bambu Bar can't reach your network")
+        default: return String(localized: "\(store.printerName) is offline")
         }
     }
 }
@@ -585,7 +586,7 @@ struct SetupPrompt: View {
                     Text("Connect your printer").font(.system(size: 15, weight: .semibold))
                     Text(store.discovered.isEmpty
                          ? "Looking for Bambu Lab printers on your network…"
-                         : "Found \(store.discovered.count == 1 ? "a printer" : "\(store.discovered.count) printers") on your network.")
+                         : "Found \(store.discovered.count) printer(s) on your network.")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -706,12 +707,12 @@ struct FooterStyle: ButtonStyle {
 enum WiFi {
     static func describe(_ dbm: Int) -> String {
         switch dbm {
-        case -55...0: return "Wi-Fi excellent"
-        case -67 ..< -55: return "Wi-Fi good"
-        case -75 ..< -67: return "Wi-Fi fair"
-        case -89 ..< -75: return "Wi-Fi weak"
-        case -90: return "Ethernet"
-        default: return "Wi-Fi poor"
+        case -55...0: return String(localized: "Wi-Fi excellent")
+        case -67 ..< -55: return String(localized: "Wi-Fi good")
+        case -75 ..< -67: return String(localized: "Wi-Fi fair")
+        case -89 ..< -75: return String(localized: "Wi-Fi weak")
+        case -90: return String(localized: "Ethernet")
+        default: return String(localized: "Wi-Fi poor")
         }
     }
 }

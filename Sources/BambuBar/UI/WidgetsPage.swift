@@ -7,7 +7,7 @@ struct WidgetsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            PageHeader(title: "Widgets", subtitle: "Your printers on the desktop and in Notification Center, in three sizes.")
+            PageHeader(title: "Widgets", subtitle: String(localized: "Your printers on the desktop and in Notification Center, in three sizes."))
             WidgetShowcase()
             howTo
         }
@@ -28,7 +28,7 @@ struct WidgetsPage: View {
         }
     }
 
-    private func step(_ n: Int, _ symbol: String, _ text: String) -> some View {
+    private func step(_ n: Int, _ symbol: String, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(n)")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -36,7 +36,7 @@ struct WidgetsPage: View {
                 .frame(width: 22, height: 22)
                 .background(Circle().fill(Palette.accent.opacity(0.15)))
             Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(.secondary).frame(width: 18).padding(.top, 3)
-            Text(LocalizedStringKey(text)).font(.system(size: 12.5)).fixedSize(horizontal: false, vertical: true)
+            Text(text).font(.system(size: 12.5)).fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 2)
         }
     }
@@ -47,7 +47,13 @@ struct WidgetsPage: View {
 enum WidgetSize: String, CaseIterable, Identifiable {
     case small, medium, large
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .small: return String(localized: "Small", comment: "Widget size")
+        case .medium: return String(localized: "Medium", comment: "Widget size")
+        case .large: return String(localized: "Large", comment: "Widget size")
+        }
+    }
     /// How much the showcase enlarges it, so every size fills the stage about equally.
     var stageScale: CGFloat {
         switch self {
@@ -76,9 +82,9 @@ enum WidgetSize: String, CaseIterable, Identifiable {
 
     var summary: String {
         switch self {
-        case .small: return "The essentials at a glance: a progress ring with the percentage, time left and when it'll be done. Paused, it says why; finished, how long ago; idle, the temperatures and loaded spools."
-        case .medium: return "The printer as it is: the part growing in the filament's colour, the job and its progress, finish time and layers, and nozzle, bed and chamber temperatures."
-        case .large: return "Everything: progress and timing, temperature tiles, every AMS spool with what's left, the newest error in plain words, and how the last print went."
+        case .small: return String(localized: "The essentials at a glance: a progress ring with the percentage, time left and when it'll be done. Paused, it says why; finished, how long ago; idle, the temperatures and loaded spools.")
+        case .medium: return String(localized: "The printer as it is: the part growing in the filament's colour, the job and its progress, finish time and layers, and nozzle, bed and chamber temperatures.")
+        case .large: return String(localized: "Everything: progress and timing, temperature tiles, every AMS spool with what's left, the newest error in plain words, and how the last print went.")
         }
     }
 }
@@ -89,16 +95,16 @@ enum WidgetFeature: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .progress: return "Progress"
-        case .timeLeft: return "Time left"
-        case .finishTime: return "Finish time"
-        case .layers: return "Layers"
-        case .stage: return "Stage & pause reason"
-        case .temperatures: return "Temperatures"
-        case .spools: return "AMS spools"
-        case .printer: return "Live drawing"
-        case .errors: return "Errors"
-        case .lastPrint: return "Last print"
+        case .progress: return String(localized: "Progress", comment: "Widget feature")
+        case .timeLeft: return String(localized: "Time left", comment: "Widget feature")
+        case .finishTime: return String(localized: "Finish time", comment: "Widget feature")
+        case .layers: return String(localized: "Layers", comment: "Widget feature")
+        case .stage: return String(localized: "Stage & pause reason", comment: "Widget feature")
+        case .temperatures: return String(localized: "Temperatures", comment: "Widget feature")
+        case .spools: return String(localized: "AMS spools", comment: "Widget feature")
+        case .printer: return String(localized: "Live drawing", comment: "Widget feature: the printer drawing that shows the part growing")
+        case .errors: return String(localized: "Errors", comment: "Widget feature")
+        case .lastPrint: return String(localized: "Last print", comment: "Widget feature")
         }
     }
 
@@ -124,11 +130,20 @@ enum ShowcaseScene: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .printing: return "Printing"
-        case .preparing: return "Heating"
-        case .paused: return "Paused"
-        case .finished: return "Finished"
-        case .idle: return "Ready"
+        case .printing: return String(localized: "Printing", comment: "Printer state")
+        case .preparing: return String(localized: "Heating", comment: "Printer state")
+        case .paused: return String(localized: "Paused", comment: "Printer state")
+        case .finished: return String(localized: "Finished", comment: "Printer state")
+        case .idle: return String(localized: "Ready", comment: "Printer state")
+        }
+    }
+    var help: String {
+        switch self {
+        case .printing: return String(localized: "Show the widget while printing")
+        case .preparing: return String(localized: "Show the widget while heating")
+        case .paused: return String(localized: "Show the widget while paused")
+        case .finished: return String(localized: "Show the widget once finished")
+        case .idle: return String(localized: "Show the widget while ready")
         }
     }
     var symbol: String {
@@ -189,8 +204,9 @@ enum ShowcaseScene: String, CaseIterable, Identifiable {
             s.layer = 182
             s.totalLayers = 284
             s.remainingMinutes = 54
-            s.issues = [PrinterIssue(id: "HMS_0700_2300_0001_0004", severity: .serious,
-                                     message: "AMS A slot 4 filament has run out. Insert a new spool to continue.", wikiURL: nil)]
+            s.issues = [PrinterIssue(id: "HMS_0700_2300_0002_0001", severity: .serious,
+                                     message: HMSCatalog.shared.hmsText("0700230000020001")
+                                         ?? "AMS A slot 4 filament has run out. Insert a new spool to continue.", wikiURL: nil)]
         case .finished:
             s.state = .finished
             s.stageID = 255
@@ -347,7 +363,7 @@ struct WidgetShowcase: View {
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("Show the widget while \(s.title.lowercased())")
+                .help(s.help)
             }
         }
         .padding(3)

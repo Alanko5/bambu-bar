@@ -111,8 +111,8 @@ final class DemoDriver {
         case .paused:
             status.state = .paused
             status.stageID = 6
-            status.issues = [PrinterIssue(id: "HMS_0700_2300_0001_0004", severity: .serious,
-                                          message: "AMS A slot 4 filament has run out. Please insert a new filament.",
+            status.issues = [PrinterIssue(id: "HMS_0700_2300_0002_0001", severity: .serious,
+                                          message: HMSCatalog.shared.hmsText("0700230000020001") ?? "AMS A slot 4 filament has run out. Please insert a new filament.",
                                           wikiURL: HMSCatalog.wikiURL(for: ""))]
         case .finished:
             status.state = .finished
@@ -128,7 +128,7 @@ final class DemoDriver {
             status.stageID = 255
             status.nozzle = Temperature(current: 180, target: 0)
             status.issues = [PrinterIssue(id: "0300_4006", severity: .fatal,
-                                          message: "The nozzle is clogged with filament. The print has been stopped.",
+                                          message: HMSCatalog.shared.errorText("03004006") ?? "The nozzle is clogged with filament. The print has been stopped.",
                                           wikiURL: HMSCatalog.wikiURL(for: ""))]
         case .idle:
             status.state = .idle

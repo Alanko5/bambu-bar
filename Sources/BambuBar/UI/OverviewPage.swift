@@ -42,7 +42,7 @@ struct OverviewPage: View {
     private var subtitle: String {
         guard let config = store.config else { return "" }
         var parts = ["Bambu Lab \(config.modelName)", config.host]
-        if let fw = store.status?.firmware { parts.append("Firmware \(fw)") }
+        if let fw = store.status?.firmware { parts.append(String(localized: "Firmware \(fw)")) }
         return parts.joined(separator: " · ")
     }
 
@@ -75,21 +75,21 @@ struct OverviewPage: View {
             SectionLabel("Printer")
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 9) {
-                    DetailRow(title: "Speed", value: "\(store.speed.title) (\(store.speed.percent)%)", symbol: "speedometer")
+                    DetailRow(title: "Speed", value: String(localized: "\(store.speed.title) (\(store.speed.percent)%)", comment: "Speed profile and its percentage"), symbol: "speedometer")
                     DetailRow(title: "Nozzle", value: nozzleText(s), symbol: "pencil.tip")
                     if store.config?.model?.isEnclosed ?? true {
-                        DetailRow(title: "Door", value: s.doorOpen.map { $0 ? "Open" : "Closed" } ?? "—", symbol: "door.left.hand.closed")
+                        DetailRow(title: "Door", value: s.doorOpen.map { $0 ? String(localized: "Open", comment: "Door") : String(localized: "Closed", comment: "Door") } ?? "—", symbol: "door.left.hand.closed")
                     }
                     if s.chamberLightOn != nil {
-                        DetailRow(title: "Light", value: store.chamberLightOn ? "On" : "Off", symbol: "lightbulb")
+                        DetailRow(title: "Light", value: store.chamberLightOn ? String(localized: "On") : String(localized: "Off"), symbol: "lightbulb")
                     }
                 }
                 .panel(radius: 16, padding: 13)
                 VStack(spacing: 9) {
                     DetailRow(title: "Network", value: s.wifiSignal.map { "\(WiFi.describe($0)) (\($0) dBm)" } ?? "—", symbol: "wifi")
-                    DetailRow(title: "Storage", value: s.hasSDCard == true ? "SD card inserted" : s.hasSDCard == false ? "No SD card" : "—", symbol: "sdcard")
-                    DetailRow(title: "Live View", value: s.liveViewEnabled == true ? "On" : s.liveViewEnabled == false ? "Off" : "—", symbol: "video")
-                    DetailRow(title: "Firmware", value: (s.firmware ?? "—") + (s.updateAvailable ? " · Update available" : ""), symbol: "cpu")
+                    DetailRow(title: "Storage", value: s.hasSDCard == true ? String(localized: "SD card inserted") : s.hasSDCard == false ? String(localized: "No SD card") : "—", symbol: "sdcard")
+                    DetailRow(title: "Live View", value: s.liveViewEnabled == true ? String(localized: "On") : s.liveViewEnabled == false ? String(localized: "Off") : "—", symbol: "video")
+                    DetailRow(title: "Firmware", value: (s.firmware ?? "—") + (s.updateAvailable ? " · " + String(localized: "Update available") : ""), symbol: "cpu")
                 }
                 .panel(radius: 16, padding: 13)
             }
@@ -116,11 +116,11 @@ struct ModelCard: View {
             VStack(spacing: 9) {
                 DetailRow(title: "Build volume", value: model.buildVolumeText, symbol: "cube")
                 DetailRow(title: "Chamber", value: model.chamberText, symbol: model.isEnclosed ? "square.stack.3d.up.fill" : "square.stack.3d.up")
-                DetailRow(title: "Nozzles", value: model.nozzleCount == 2 ? "Two, up to \(model.nozzleMax) °C" : "One, up to \(model.nozzleMax) °C", symbol: "flame")
+                DetailRow(title: "Nozzles", value: model.nozzleCount == 2 ? String(localized: "Two, up to \(model.nozzleMax) °C") : String(localized: "One, up to \(model.nozzleMax) °C"), symbol: "flame")
             }
             .panel(radius: 16, padding: 13)
             VStack(spacing: 9) {
-                DetailRow(title: "Bed", value: "Up to \(model.bedMax) °C", symbol: "heat.waves")
+                DetailRow(title: "Bed", value: String(localized: "Up to \(model.bedMax) °C"), symbol: "heat.waves")
                 DetailRow(title: "Fans", value: fans, symbol: "fan")
                 DetailRow(title: "Filament", value: model.usesAMSLite ? "AMS Lite" : "AMS, AMS 2 Pro, AMS HT", symbol: "circle.circle")
             }
@@ -129,9 +129,9 @@ struct ModelCard: View {
     }
 
     private var fans: String {
-        var parts = ["Part cooling"]
-        if model.hasAuxFan { parts.append("aux") }
-        if model.hasChamberFan { parts.append("chamber") }
+        var parts = [String(localized: "Part cooling")]
+        if model.hasAuxFan { parts.append(String(localized: "aux", comment: "Auxiliary fan, in a list after “Part cooling”")) }
+        if model.hasChamberFan { parts.append(String(localized: "chamber", comment: "Chamber fan, in a list after “Part cooling”")) }
         return parts.joined(separator: ", ")
     }
 }
@@ -155,7 +155,7 @@ struct FanTile: View {
         .panel(radius: 14, padding: 11)
     }
 
-    private func fan(_ title: String, _ value: Int?) -> some View {
+    private func fan(_ title: LocalizedStringKey, _ value: Int?) -> some View {
         HStack(spacing: 6) {
             Text(title).font(.system(size: 10.5)).foregroundStyle(.secondary).frame(width: 46, alignment: .leading)
             GeometryReader { geo in
@@ -176,19 +176,19 @@ enum NozzleType {
     static func describe(_ code: String) -> String {
         let upper = code.uppercased()
         guard upper.count >= 4 else {
-            return upper.contains("HARDENED") ? "Hardened steel" : upper.contains("STAINLESS") ? "Stainless steel" : code
+            return upper.contains("HARDENED") ? String(localized: "Hardened steel") : upper.contains("STAINLESS") ? String(localized: "Stainless steel") : code
         }
         let chars = Array(upper)
         let material: String
         switch String(chars[2...3]) {
-        case "00": material = "Stainless steel"
-        case "01": material = "Hardened steel"
-        case "05": material = "Tungsten carbide"
+        case "00": material = String(localized: "Stainless steel")
+        case "01": material = String(localized: "Hardened steel")
+        case "05": material = String(localized: "Tungsten carbide")
         default: material = code
         }
         switch chars[1] {
-        case "U": return material + ", TPU high flow"
-        case "H", "E": return material + ", high flow"
+        case "U": return String(localized: "\(material), TPU high flow", comment: "Nozzle material, then its type")
+        case "H", "E": return String(localized: "\(material), high flow", comment: "Nozzle material, then its type")
         default: return material
         }
     }
@@ -250,9 +250,9 @@ struct PrinterNameField: View {
 
     private func hint(_ config: PrinterConfig) -> String {
         if let announced = store.announcedName(for: config.serial), announced != draft {
-            return "Only in Bambu Bar. The printer still calls itself \u{201C}\(announced)\u{201D}; rename it there in Bambu Handy."
+            return String(localized: "Only in Bambu Bar. The printer still calls itself \u{201C}\(announced)\u{201D}; rename it there in Bambu Handy.")
         }
-        return "Only in Bambu Bar, for the menu bar, window and widgets. The printer keeps its own name."
+        return String(localized: "Only in Bambu Bar, for the menu bar, window and widgets. The printer keeps its own name.")
     }
 
     private func save() {

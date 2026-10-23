@@ -43,9 +43,9 @@ struct PrinterModel: Equatable, Sendable {
     var buildVolumeText: String { "\(buildVolume.x) × \(buildVolume.y) × \(buildVolume.z) mm" }
 
     var chamberText: String {
-        if let max = chamberHeaterMax { return "Heated, up to \(max) °C" }
-        if hasChamberSensor { return "Enclosed, with temperature sensor" }
-        return isEnclosed ? "Enclosed" : "Open frame"
+        if let max = chamberHeaterMax { return String(localized: "Heated, up to \(max) °C") }
+        if hasChamberSensor { return String(localized: "Enclosed, with temperature sensor") }
+        return isEnclosed ? String(localized: "Enclosed") : String(localized: "Open frame")
     }
 
     // MARK: - Catalog
@@ -116,7 +116,7 @@ struct PrinterModel: Equatable, Sendable {
     }
 
     static func name(for code: String, serial: String = "") -> String {
-        find(code: code, serial: serial)?.name ?? "Bambu Lab printer"
+        find(code: code, serial: serial)?.name ?? String(localized: "Bambu Lab printer")
     }
 }
 

@@ -89,7 +89,7 @@ final class UpdateChecker {
             lastChecked = Date()
             UserDefaults.standard.set(lastChecked, forKey: Key.lastChecked)
         } catch {
-            state = .failed("Couldn’t reach GitHub. Check your connection and try again.")
+            state = .failed(String(localized: "Couldn’t reach GitHub. Check your connection and try again."))
         }
     }
 
@@ -100,17 +100,17 @@ final class UpdateChecker {
         let alert = NSAlert()
         switch state {
         case .available(let release):
-            alert.messageText = "Bambu Bar \(release.version) is available"
-            alert.informativeText = "You have \(currentVersion). Download the new version from its GitHub release page, then replace the app in your Applications folder."
-            alert.addButton(withTitle: "Download")
-            alert.addButton(withTitle: "Later")
+            alert.messageText = String(localized: "Bambu Bar \(release.version) is available")
+            alert.informativeText = String(localized: "You have \(currentVersion). Download the new version from its GitHub release page, then replace the app in your Applications folder.")
+            alert.addButton(withTitle: String(localized: "Download"))
+            alert.addButton(withTitle: String(localized: "Later"))
             if alert.runModal() == .alertFirstButtonReturn { download(release) }
         case .upToDate:
-            alert.messageText = "You’re up to date"
-            alert.informativeText = "Bambu Bar \(currentVersion) is the latest version."
+            alert.messageText = String(localized: "You’re up to date")
+            alert.informativeText = String(localized: "Bambu Bar \(currentVersion) is the latest version.")
             alert.runModal()
         case .failed(let message):
-            alert.messageText = "Couldn’t check for updates"
+            alert.messageText = String(localized: "Couldn’t check for updates")
             alert.informativeText = message
             alert.runModal()
         case .idle, .checking:

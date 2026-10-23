@@ -8,11 +8,11 @@ struct AboutPage: View {
 
     private var updateLine: String {
         switch updates.state {
-        case .available(let release): return "\(release.version) is available"
-        case .upToDate: return "Up to date"
-        case .checking: return "Checking…"
-        case .failed: return "Couldn’t check"
-        case .idle: return updates.lastChecked == nil ? "Not checked yet" : "Up to date"
+        case .available(let release): return String(localized: "\(release.version) is available", comment: "A version number")
+        case .upToDate: return String(localized: "Up to date")
+        case .checking: return String(localized: "Checking…")
+        case .failed: return String(localized: "Couldn’t check")
+        case .idle: return updates.lastChecked == nil ? String(localized: "Not checked yet") : String(localized: "Up to date")
         }
     }
 
@@ -45,7 +45,7 @@ struct AboutPage: View {
             section("This copy") {
                 DetailRow(title: "Version", value: "\(AppInfo.version) (\(AppInfo.build))")
                 DetailRow(title: "System", value: "\(AppInfo.system) · \(AppInfo.architecture)")
-                DetailRow(title: "License", value: "MIT, free and open source")
+                DetailRow(title: "License", value: String(localized: "MIT, free and open source"))
                 HStack {
                     Text("Updates").font(.system(size: 12)).foregroundStyle(.secondary)
                     Spacer()
@@ -83,14 +83,14 @@ struct AboutPage: View {
             }
 
             section("Credits") {
-                paragraph("Protocol details and the English HMS error texts come from the open-source ha-bambulab project (MIT), with thanks to Bambuddy and bambu-cli for documenting the newer printers. What each model can do (chamber sensor, fans, heated chamber, nozzles, build volume) follows the printer profiles Bambu Lab publishes with Bambu Studio.")
+                paragraph("Protocol details and the HMS error texts come from the open-source ha-bambulab project (MIT), with thanks to Bambuddy and bambu-cli for documenting the newer printers. What each model can do (chamber sensor, fans, heated chamber, nozzles, build volume) follows the printer profiles Bambu Lab publishes with Bambu Studio.")
                 paragraph("The printer models were built for this project in Blender. They are visual approximations, not manufacturer CAD.")
                 paragraph("Bambu Lab, Bambu Studio and P2S are trademarks of Bambu Lab. Bambu Bar is an independent project, not affiliated with or endorsed by Bambu Lab.")
             }
         }
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(title)
             VStack(alignment: .leading, spacing: 10) { content() }
@@ -98,7 +98,7 @@ struct AboutPage: View {
         }
     }
 
-    private func link(_ title: String, symbol: String, _ url: URL) -> some View {
+    private func link(_ title: LocalizedStringKey, symbol: String, _ url: URL) -> some View {
         Button { NSWorkspace.shared.open(url) } label: {
             HStack(spacing: 8) {
                 Image(systemName: symbol).frame(width: 18)
@@ -111,7 +111,7 @@ struct AboutPage: View {
         .help(url.absoluteString)
     }
 
-    private func paragraph(_ text: String) -> some View {
+    private func paragraph(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.system(size: 12.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 

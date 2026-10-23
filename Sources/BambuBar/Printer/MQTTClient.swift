@@ -157,10 +157,10 @@ final class MQTTClient {
         switch error {
         case .posix(let code):
             switch code {
-            case .ECONNREFUSED: return "The printer refused the connection."
-            case .EHOSTUNREACH, .EHOSTDOWN: return "The printer isn't reachable on the network."
-            case .ENETDOWN, .ENETUNREACH: return "This Mac isn't on a network."
-            case .ETIMEDOUT: return "The printer didn't answer."
+            case .ECONNREFUSED: return String(localized: "The printer refused the connection.")
+            case .EHOSTUNREACH, .EHOSTDOWN: return String(localized: "The printer isn't reachable on the network.")
+            case .ENETDOWN, .ENETUNREACH: return String(localized: "This Mac isn't on a network.")
+            case .ETIMEDOUT: return String(localized: "The printer didn't answer.")
             default: return error.localizedDescription
             }
         default:

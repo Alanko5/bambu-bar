@@ -41,35 +41,35 @@ struct WidgetState {
 
     var headline: String {
         switch snapshot.link {
-        case .unconfigured: return "Set up Bambu Bar"
-        case .offline: return "Offline"
-        case .unauthorized: return "Access code rejected"
-        case .connecting where status == nil: return "Connecting…"
+        case .unconfigured: return String(localized: "Set up Bambu Bar")
+        case .offline: return String(localized: "Offline")
+        case .unauthorized: return String(localized: "Access code rejected")
+        case .connecting where status == nil: return String(localized: "Connecting…")
         default: break
         }
-        guard let s = status else { return "Offline" }
-        if s.state == .idle { return "Ready" }
+        guard let s = status else { return String(localized: "Offline") }
+        if s.state == .idle { return s.state.title }
         return s.jobName.isEmpty ? s.state.title : s.jobName
     }
 
     var stateLine: String {
         guard let s = status else {
             switch snapshot.link {
-            case .unconfigured: return "Open the app to connect your printer"
-            case .unauthorized: return "Enter the access code again in the app"
-            default: return lastJobLine ?? "Waiting for the printer"
+            case .unconfigured: return String(localized: "Open the app to connect your printer")
+            case .unauthorized: return String(localized: "Enter the access code again in the app")
+            default: return lastJobLine ?? String(localized: "Waiting for the printer")
             }
         }
         if s.state == .printing, let left = minutesLeft {
-            return "\(Format.duration(minutes: left)) left"
+            return String(localized: "\(Format.duration(minutes: left)) left", comment: "Time left, such as “2h 05m left”")
         }
-        if s.state == .idle { return lastJobLine ?? "Ready to print" }
+        if s.state == .idle { return lastJobLine ?? String(localized: "Ready to print") }
         return s.detailText
     }
 
     var lastJobLine: String? {
         guard let last = snapshot.lastJob else { return nil }
-        return "Last: \(last.name)"
+        return String(localized: "Last: \(last.name)", comment: "The last print's name")
     }
 
     var finishText: String? {
@@ -141,15 +141,12 @@ struct SmallWidgetView: View {
                     .minimumScaleFactor(0.7)
                 Text("left").font(.system(size: 10.5)).foregroundStyle(.secondary)
             case .preparing:
-                Text(s.stageText ?? "Getting ready")
+                Text(s.stageText ?? String(localized: "Getting ready"))
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             case .paused:
-                Text(s.stageText.map { reason in
-                    let short = reason.replacingOccurrences(of: "Paused: ", with: "").replacingOccurrences(of: "Paused by ", with: "By ")
-                    return short.prefix(1).uppercased() + short.dropFirst()
-                } ?? "Waiting")
+                Text(s.pauseReason ?? String(localized: "Waiting", comment: "A paused print, reason unknown"))
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -227,16 +224,16 @@ struct SmallWidgetView: View {
         let layers = s.totalLayers > 0 ? "\(s.layer)/\(s.totalLayers)" : nil
         switch s.state {
         case .printing:
-            return [w.finishText.map { "Done \($0)" }, layers].compactMap { $0 }.joined(separator: " · ")
+            return [w.finishText.map { String(localized: "Done \($0)", comment: "Finish time, such as “Done 14:32”") }, layers].compactMap { $0 }.joined(separator: " · ")
         case .preparing:
             let n = s.activeNozzle
-            return n.isHeating ? "\(s.activeNozzleTitle) \(Int(n.current))° → \(Int(n.target))°" : "Starting soon"
+            return n.isHeating ? "\(s.activeNozzleTitle) \(Int(n.current))° → \(Int(n.target))°" : String(localized: "Starting soon")
         case .paused:
-            return [layers.map { "Layer \($0)" }, "\(s.progress)%"].compactMap { $0 }.joined(separator: " · ")
+            return [layers.map { String(localized: "Layer \($0)", comment: "Such as “Layer 182/284”") }, "\(s.progress)%"].compactMap { $0 }.joined(separator: " · ")
         case .finished:
-            return "Ready to remove" + (layers.map { " · \($0)" } ?? "")
+            return String(localized: "Ready to remove") + (layers.map { " · \($0)" } ?? "")
         case .failed:
-            return s.canceled ? "Canceled" : (s.issues.first?.message ?? "Print failed")
+            return s.canceled ? s.stateTitle : (s.issues.first?.message ?? String(localized: "Print failed"))
         case .idle:
             return ""
         }
@@ -244,8 +241,8 @@ struct SmallWidgetView: View {
 
     static func ago(_ date: Date, _ now: Date) -> String {
         let minutes = Int(now.timeIntervalSince(date) / 60)
-        if minutes < 1 { return "Just now" }
-        return Format.duration(minutes: minutes) + " ago"
+        if minutes < 1 { return String(localized: "Just now") }
+        return String(localized: "\(Format.duration(minutes: minutes)) ago", comment: "Such as “2h 05m ago”")
     }
 }
 
@@ -377,15 +374,15 @@ struct LargeWidgetView: View {
                 HStack(spacing: 8) {
                     WidgetTempTile(title: s.activeNozzleTitle, symbol: "flame.fill", value: s.activeNozzle.current, target: s.activeNozzle.target,
                                    tint: Palette.nozzle)
-                    WidgetTempTile(title: "Bed", symbol: "heat.waves", value: s.bed.current, target: s.bed.target, tint: Palette.bed)
+                    WidgetTempTile(title: String(localized: "Bed"), symbol: "heat.waves", value: s.bed.current, target: s.bed.target, tint: Palette.bed)
                     if let chamber = s.chamber {
-                        WidgetTempTile(title: "Chamber", symbol: "thermometer.medium", value: chamber,
+                        WidgetTempTile(title: String(localized: "Chamber"), symbol: "thermometer.medium", value: chamber,
                                        target: s.chamberTarget, tint: Palette.chamber)
                     } else if let other = s.idleNozzle {
                         WidgetTempTile(title: s.idleNozzleTitle, symbol: "flame.fill", value: other.current, target: other.target,
                                        tint: Palette.nozzle)
                     } else if let fan = s.partFan {
-                        WidgetStatTile(title: "Part fan", symbol: "fan.fill", value: "\(fan)%",
+                        WidgetStatTile(title: String(localized: "Part fan"), symbol: "fan.fill", value: "\(fan)%",
                                        tint: Palette.chamber, active: fan > 0)
                     }
                 }
@@ -405,7 +402,7 @@ struct LargeWidgetView: View {
                             ForEach(unit.spools) { spool in
                                 VStack(spacing: 3) {
                                     SpoolSwatch(spool: spool, active: spool.id == s.activeSpoolID && s.state.isActive, size: 34)
-                                    Text(spool.isLoaded ? spool.material : "Empty")
+                                    Text(spool.isLoaded ? spool.material : String(localized: "Empty", comment: "Filament slot"))
                                         .font(.system(size: 10.5, weight: .semibold)).lineLimit(1)
                                     Text(spool.isLoaded ? spool.amountText : spool.label)
                                         .font(.system(size: 10)).foregroundStyle(.secondary)

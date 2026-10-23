@@ -9,6 +9,7 @@ struct SettingsPage: View {
     @State private var code = ""
     @State private var editingConnection = false
     @State private var confirmForget = false
+    @State private var language = AppLanguage.override
 
     var body: some View {
         @Bindable var store = store
@@ -29,7 +30,7 @@ struct SettingsPage: View {
             }
 
             if let config = store.config {
-                group(store.hasMultiplePrinters ? config.name : "Printer", symbol: "printer.fill") {
+                group(store.hasMultiplePrinters ? "\(config.name)" : "Printer", symbol: "printer.fill") {
                     row("Name") {
                         HStack(spacing: 8) {
                             if name != config.name {
@@ -146,6 +147,31 @@ struct SettingsPage: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            group("Language", symbol: "globe") {
+                row("Language") {
+                    Picker("", selection: $language) {
+                        Text("System (\(AppLanguage.name(of: AppLanguage.system)))").tag(String?.none)
+                        Divider()
+                        ForEach(AppLanguage.available, id: \.self) { Text(verbatim: AppLanguage.name(of: $0)).tag(Optional($0)) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 220)
+                    .onChange(of: language) { AppLanguage.override = language }
+                }
+                if (language ?? AppLanguage.system) != AppLanguage.current {
+                    HStack {
+                        Text("Bambu Bar switches to \(AppLanguage.name(of: language ?? AppLanguage.system)) when it restarts.")
+                            .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Restart Now") { AppLanguage.relaunch() }.controlSize(.small)
+                    }
+                } else {
+                    Text("Bambu Bar follows the language of your Mac unless you pick another one here.")
+                        .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             group("Notifications", symbol: "bell.badge.fill") {
                 toggle("Print finished", isOn: $store.notifyFinished)
                 toggle("Print failed, canceled or an error", isOn: $store.notifyFailed)
@@ -219,7 +245,7 @@ struct SettingsPage: View {
         editingConnection = false
     }
 
-    private func group<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
+    private func group<Content: View>(_ title: LocalizedStringKey, symbol: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: symbol)
                 .font(.system(size: 13, weight: .semibold))
@@ -229,7 +255,7 @@ struct SettingsPage: View {
         }
     }
 
-    private func row<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func row<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         HStack {
             Text(title).font(.system(size: 12.5))
             Spacer(minLength: 12)
@@ -237,7 +263,7 @@ struct SettingsPage: View {
         }
     }
 
-    private func toggle(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func toggle(_ title: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         HStack {
             Text(title).font(.system(size: 12.5))
             Spacer()
@@ -304,19 +330,19 @@ private struct UpdatesGroup: View {
 
     private var title: String {
         switch updates.state {
-        case .available(let release): return "Version \(release.version) is available"
-        case .upToDate: return "Bambu Bar is up to date"
-        case .failed: return "Couldn’t check for updates"
-        case .checking: return "Checking…"
-        case .idle: return "Version \(updates.currentVersion)"
+        case .available(let release): return String(localized: "Version \(release.version) is available")
+        case .upToDate: return String(localized: "Bambu Bar is up to date")
+        case .failed: return String(localized: "Couldn’t check for updates")
+        case .checking: return String(localized: "Checking…")
+        case .idle: return String(localized: "Version \(updates.currentVersion)")
         }
     }
 
     private var detail: String {
         if case .failed(let message) = updates.state { return message }
-        if case .available = updates.state { return "You have \(updates.currentVersion). Replace the app in Applications with the new download." }
-        guard let last = updates.lastChecked else { return "Not checked yet" }
-        return "Version \(updates.currentVersion) · last checked \(last.formatted(.relative(presentation: .named)))"
+        if case .available = updates.state { return String(localized: "You have \(updates.currentVersion). Replace the app in Applications with the new download.") }
+        guard let last = updates.lastChecked else { return String(localized: "Not checked yet") }
+        return String(localized: "Version \(updates.currentVersion) · last checked \(last.formatted(.relative(presentation: .named)))")
     }
 }
 

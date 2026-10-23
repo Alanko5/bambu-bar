@@ -20,12 +20,12 @@ enum JobState: String, Codable, Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .idle: return "Ready"
-        case .preparing: return "Preparing"
-        case .printing: return "Printing"
-        case .paused: return "Paused"
-        case .finished: return "Finished"
-        case .failed: return "Failed"
+        case .idle: return String(localized: "Ready", comment: "Printer state")
+        case .preparing: return String(localized: "Preparing", comment: "Printer state")
+        case .printing: return String(localized: "Printing", comment: "Printer state")
+        case .paused: return String(localized: "Paused", comment: "Printer state")
+        case .finished: return String(localized: "Finished", comment: "Printer state")
+        case .failed: return String(localized: "Failed", comment: "Printer state")
         }
     }
 }
@@ -37,10 +37,10 @@ enum SpeedLevel: Int, Codable, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .silent: return "Silent"
-        case .standard: return "Standard"
-        case .sport: return "Sport"
-        case .ludicrous: return "Ludicrous"
+        case .silent: return String(localized: "Silent", comment: "Print speed profile")
+        case .standard: return String(localized: "Standard", comment: "Print speed profile")
+        case .sport: return String(localized: "Sport", comment: "Print speed profile")
+        case .ludicrous: return String(localized: "Ludicrous", comment: "Print speed profile")
         }
     }
     /// Nominal speed relative to Standard, as Bambu Studio shows it.
@@ -105,7 +105,7 @@ struct Spool: Codable, Equatable, Identifiable, Sendable {
 
     var isExternal: Bool { id == Self.externalID }
     var remainText: String {
-        if !isLoaded { return "Empty" }
+        if !isLoaded { return String(localized: "Empty", comment: "Filament slot") }
         if let remain { return "\(remain)%" }
         return "—"
     }
@@ -126,14 +126,14 @@ struct Spool: Codable, Equatable, Identifiable, Sendable {
 
     /// "81% · ≈ 810 g", for tooltips.
     var remainDetail: String {
-        guard isLoaded else { return "Empty" }
-        guard let remain else { return "Not measured" }
+        guard isLoaded else { return String(localized: "Empty", comment: "Filament slot") }
+        guard let remain else { return String(localized: "Not measured", comment: "Filament left on a spool without RFID") }
         guard let grams = gramsLeft else { return "\(remain)%" }
         return "\(remain)% · \(Format.grams(grams))"
     }
     /// "A1", "A2"… like the printer's screen; "Ext" for the external spool.
     var label: String {
-        if isExternal { return "Ext" }
+        if isExternal { return String(localized: "Ext", comment: "Short label for the external spool, beside AMS slots like A1") }
         if unit >= 128 { return "HT\(unit - 127)" }
         let letter = String(UnicodeScalar(UInt8(65 + min(unit, 25))))
         return "\(letter)\(slot + 1)"
@@ -178,10 +178,10 @@ enum IssueSeverity: Int, Codable, Comparable, Sendable {
 
     var title: String {
         switch self {
-        case .fatal: return "Error"
-        case .serious: return "Warning"
-        case .common: return "Notice"
-        case .info: return "Info"
+        case .fatal: return String(localized: "Error", comment: "Issue severity")
+        case .serious: return String(localized: "Warning", comment: "Issue severity")
+        case .common: return String(localized: "Notice", comment: "Issue severity")
+        case .info: return String(localized: "Info", comment: "Issue severity")
         }
     }
 }
@@ -247,32 +247,60 @@ struct PrinterStatus: Codable, Equatable, Sendable {
     /// The other nozzle on two-nozzle models.
     var idleNozzle: Temperature? { secondNozzle.map { leftNozzleInUse == true ? nozzle : $0 } }
     /// "Nozzle", or which of the two is printing.
-    var activeNozzleTitle: String { secondNozzle == nil ? "Nozzle" : leftNozzleInUse == true ? "Left nozzle" : "Right nozzle" }
-    var idleNozzleTitle: String { leftNozzleInUse == true ? "Right nozzle" : "Left nozzle" }
+    var activeNozzleTitle: String {
+        secondNozzle == nil ? String(localized: "Nozzle") : leftNozzleInUse == true ? String(localized: "Left nozzle") : String(localized: "Right nozzle")
+    }
+    var idleNozzleTitle: String { leftNozzleInUse == true ? String(localized: "Right nozzle") : String(localized: "Left nozzle") }
 
     /// "Canceled" for a job someone stopped, otherwise the state's own title.
-    var stateTitle: String { state == .failed && canceled ? "Canceled" : state.title }
+    var stateTitle: String { state == .failed && canceled ? String(localized: "Canceled", comment: "Printer state") : state.title }
 
     var stageText: String? {
         guard let stageID, stageID != 255, stageID != -1 else { return nil }
         return Self.stageNames[stageID]
     }
 
+    /// Why the printer paused, short for the small widget ("Filament ran out", "By user").
+    var pauseReason: String? {
+        guard let stageID else { return nil }
+        return Self.pauseReasons[stageID]
+    }
+
+    /// Stages where the printer has paused the print.
+    private static var pausedStages: Set<Int> { Set(pauseReasons.keys) }
+
+    static let pauseReasons: [Int: String] = [
+        6: String(localized: "Filament ran out", comment: "Pause reason"),
+        16: String(localized: "By user", comment: "Pause reason"),
+        17: String(localized: "Front cover fell off", comment: "Pause reason"),
+        20: String(localized: "Nozzle temperature fault", comment: "Pause reason"),
+        21: String(localized: "Heatbed temperature fault", comment: "Pause reason"),
+        23: String(localized: "Skipped steps", comment: "Pause reason"),
+        26: String(localized: "AMS offline", comment: "Pause reason"),
+        27: String(localized: "Heatbreak fan too slow", comment: "Pause reason"),
+        28: String(localized: "Chamber temperature fault", comment: "Pause reason"),
+        30: String(localized: "By G-code", comment: "Pause reason"),
+        32: String(localized: "Nozzle clumping", comment: "Pause reason"),
+        33: String(localized: "Cutter error", comment: "Pause reason"),
+        34: String(localized: "First layer error", comment: "Pause reason"),
+        35: String(localized: "Nozzle clog", comment: "Pause reason"),
+    ]
+
     /// The line under the job name: "Heating hotend", "Paused: filament runout", "Layer 170 of 305"…
     var detailText: String {
         switch state {
         case .printing:
             if let stageText, stageID != 0 { return stageText }
-            if totalLayers > 0 { return "Layer \(layer) of \(totalLayers)" }
-            return "Printing"
+            if totalLayers > 0 { return String(localized: "Layer \(layer) of \(totalLayers)") }
+            return state.title
         case .preparing:
-            return stageText ?? "Preparing"
+            return stageText ?? state.title
         case .paused:
-            if let stageText, stageText.hasPrefix("Paused") { return stageText }
-            return "Paused"
-        case .finished: return "Finished"
-        case .failed: return canceled ? "Canceled" : issues.first?.message ?? "Print failed"
-        case .idle: return stageText ?? "Ready to print"
+            if let stageText, let stageID, Self.pausedStages.contains(stageID) { return stageText }
+            return state.title
+        case .finished: return state.title
+        case .failed: return canceled ? stateTitle : issues.first?.message ?? String(localized: "Print failed")
+        case .idle: return stageText ?? String(localized: "Ready to print")
         }
     }
 
@@ -301,32 +329,84 @@ struct PrinterStatus: Codable, Equatable, Sendable {
     }
 
     static let stageNames: [Int: String] = [
-        0: "Printing", 1: "Auto bed leveling", 2: "Preheating heatbed", 3: "Vibration compensation",
-        4: "Changing filament", 5: "M400 pause", 6: "Paused: filament ran out", 7: "Heating hotend",
-        8: "Calibrating extrusion", 9: "Scanning bed surface", 10: "Inspecting first layer",
-        11: "Identifying build plate", 12: "Calibrating Micro Lidar", 13: "Homing toolhead",
-        14: "Cleaning nozzle tip", 15: "Checking extruder temperature", 16: "Paused by user",
-        17: "Paused: front cover fell off", 18: "Calibrating Micro Lidar", 19: "Calibrating flow ratio",
-        20: "Paused: nozzle temperature fault", 21: "Paused: heatbed temperature fault", 22: "Unloading filament",
-        23: "Paused: skipped steps", 24: "Loading filament", 25: "Calibrating motor noise",
-        26: "Paused: AMS offline", 27: "Paused: heatbreak fan too slow", 28: "Paused: chamber temperature fault",
-        29: "Cooling chamber", 30: "Paused by G-code", 31: "Motor noise showoff",
-        32: "Paused: nozzle clumping", 33: "Paused: cutter error", 34: "Paused: first layer error",
-        35: "Paused: nozzle clog", 36: "Measuring motion precision", 37: "Enhancing motion precision",
-        38: "Measuring motion accuracy", 39: "Calibrating nozzle offset", 40: "High-temperature bed leveling",
-        41: "Checking quick-release lever", 42: "Checking door and top cover", 43: "Calibrating laser",
-        44: "Checking platform", 45: "Checking BirdsEye camera", 46: "Calibrating BirdsEye camera",
-        47: "Bed leveling, phase 1", 48: "Bed leveling, phase 2", 49: "Heating chamber",
-        50: "Cooling heatbed", 51: "Printing calibration lines", 52: "Checking material",
-        53: "Calibrating Live View camera", 54: "Waiting for heatbed temperature", 55: "Checking material position",
-        56: "Calibrating cutter offset", 57: "Measuring surface", 58: "Thermal preconditioning",
-        59: "Homing blade holder", 60: "Calibrating camera offset", 61: "Calibrating blade holder",
-        62: "Hotend pick-and-place test", 63: "Waiting for chamber temperature", 64: "Preparing hotend",
-        65: "Calibrating clumping detection", 66: "Purifying chamber air", 67: "Measuring rotary attachment",
-        68: "Moving to purge chute", 69: "Cooling nozzle", 70: "Centering toolhead",
-        71: "Arc fitting", 72: "Detecting hotend type", 73: "Detecting build plate alignment",
-        74: "Checking heatbed for objects", 75: "Checking heatbed underside", 76: "Pre-extruding",
-        77: "Preparing AMS",
+        0: String(localized: "Printing", comment: "Printer stage"),
+        1: String(localized: "Auto bed leveling", comment: "Printer stage"),
+        2: String(localized: "Preheating heatbed", comment: "Printer stage"),
+        3: String(localized: "Vibration compensation", comment: "Printer stage"),
+        4: String(localized: "Changing filament", comment: "Printer stage"),
+        5: String(localized: "M400 pause", comment: "Printer stage"),
+        6: String(localized: "Paused: filament ran out", comment: "Printer stage"),
+        7: String(localized: "Heating hotend", comment: "Printer stage"),
+        8: String(localized: "Calibrating extrusion", comment: "Printer stage"),
+        9: String(localized: "Scanning bed surface", comment: "Printer stage"),
+        10: String(localized: "Inspecting first layer", comment: "Printer stage"),
+        11: String(localized: "Identifying build plate", comment: "Printer stage"),
+        12: String(localized: "Calibrating Micro Lidar", comment: "Printer stage"),
+        13: String(localized: "Homing toolhead", comment: "Printer stage"),
+        14: String(localized: "Cleaning nozzle tip", comment: "Printer stage"),
+        15: String(localized: "Checking extruder temperature", comment: "Printer stage"),
+        16: String(localized: "Paused by user", comment: "Printer stage"),
+        17: String(localized: "Paused: front cover fell off", comment: "Printer stage"),
+        18: String(localized: "Calibrating Micro Lidar", comment: "Printer stage"),
+        19: String(localized: "Calibrating flow ratio", comment: "Printer stage"),
+        20: String(localized: "Paused: nozzle temperature fault", comment: "Printer stage"),
+        21: String(localized: "Paused: heatbed temperature fault", comment: "Printer stage"),
+        22: String(localized: "Unloading filament", comment: "Printer stage"),
+        23: String(localized: "Paused: skipped steps", comment: "Printer stage"),
+        24: String(localized: "Loading filament", comment: "Printer stage"),
+        25: String(localized: "Calibrating motor noise", comment: "Printer stage"),
+        26: String(localized: "Paused: AMS offline", comment: "Printer stage"),
+        27: String(localized: "Paused: heatbreak fan too slow", comment: "Printer stage"),
+        28: String(localized: "Paused: chamber temperature fault", comment: "Printer stage"),
+        29: String(localized: "Cooling chamber", comment: "Printer stage"),
+        30: String(localized: "Paused by G-code", comment: "Printer stage"),
+        31: String(localized: "Motor noise showoff", comment: "Printer stage"),
+        32: String(localized: "Paused: nozzle clumping", comment: "Printer stage"),
+        33: String(localized: "Paused: cutter error", comment: "Printer stage"),
+        34: String(localized: "Paused: first layer error", comment: "Printer stage"),
+        35: String(localized: "Paused: nozzle clog", comment: "Printer stage"),
+        36: String(localized: "Measuring motion precision", comment: "Printer stage"),
+        37: String(localized: "Enhancing motion precision", comment: "Printer stage"),
+        38: String(localized: "Measuring motion accuracy", comment: "Printer stage"),
+        39: String(localized: "Calibrating nozzle offset", comment: "Printer stage"),
+        40: String(localized: "High-temperature bed leveling", comment: "Printer stage"),
+        41: String(localized: "Checking quick-release lever", comment: "Printer stage"),
+        42: String(localized: "Checking door and top cover", comment: "Printer stage"),
+        43: String(localized: "Calibrating laser", comment: "Printer stage"),
+        44: String(localized: "Checking platform", comment: "Printer stage"),
+        45: String(localized: "Checking BirdsEye camera", comment: "Printer stage"),
+        46: String(localized: "Calibrating BirdsEye camera", comment: "Printer stage"),
+        47: String(localized: "Bed leveling, phase 1", comment: "Printer stage"),
+        48: String(localized: "Bed leveling, phase 2", comment: "Printer stage"),
+        49: String(localized: "Heating chamber", comment: "Printer stage"),
+        50: String(localized: "Cooling heatbed", comment: "Printer stage"),
+        51: String(localized: "Printing calibration lines", comment: "Printer stage"),
+        52: String(localized: "Checking material", comment: "Printer stage"),
+        53: String(localized: "Calibrating Live View camera", comment: "Printer stage"),
+        54: String(localized: "Waiting for heatbed temperature", comment: "Printer stage"),
+        55: String(localized: "Checking material position", comment: "Printer stage"),
+        56: String(localized: "Calibrating cutter offset", comment: "Printer stage"),
+        57: String(localized: "Measuring surface", comment: "Printer stage"),
+        58: String(localized: "Thermal preconditioning", comment: "Printer stage"),
+        59: String(localized: "Homing blade holder", comment: "Printer stage"),
+        60: String(localized: "Calibrating camera offset", comment: "Printer stage"),
+        61: String(localized: "Calibrating blade holder", comment: "Printer stage"),
+        62: String(localized: "Hotend pick-and-place test", comment: "Printer stage"),
+        63: String(localized: "Waiting for chamber temperature", comment: "Printer stage"),
+        64: String(localized: "Preparing hotend", comment: "Printer stage"),
+        65: String(localized: "Calibrating clumping detection", comment: "Printer stage"),
+        66: String(localized: "Purifying chamber air", comment: "Printer stage"),
+        67: String(localized: "Measuring rotary attachment", comment: "Printer stage"),
+        68: String(localized: "Moving to purge chute", comment: "Printer stage"),
+        69: String(localized: "Cooling nozzle", comment: "Printer stage"),
+        70: String(localized: "Centering toolhead", comment: "Printer stage"),
+        71: String(localized: "Arc fitting", comment: "Printer stage"),
+        72: String(localized: "Detecting hotend type", comment: "Printer stage"),
+        73: String(localized: "Detecting build plate alignment", comment: "Printer stage"),
+        74: String(localized: "Checking heatbed for objects", comment: "Printer stage"),
+        75: String(localized: "Checking heatbed underside", comment: "Printer stage"),
+        76: String(localized: "Pre-extruding", comment: "Printer stage"),
+        77: String(localized: "Preparing AMS", comment: "Printer stage"),
     ]
 }
 
@@ -352,11 +432,11 @@ struct JobRecord: Codable, Equatable, Identifiable, Sendable {
 
         var title: String {
             switch self {
-            case .running: return "In progress"
-            case .finished: return "Finished"
-            case .failed: return "Failed"
-            case .canceled: return "Canceled"
-            case .ended: return "Ended"
+            case .running: return String(localized: "In progress", comment: "How a print ended")
+            case .finished: return String(localized: "Finished", comment: "How a print ended")
+            case .failed: return String(localized: "Failed", comment: "How a print ended")
+            case .canceled: return String(localized: "Canceled", comment: "How a print ended")
+            case .ended: return String(localized: "Ended", comment: "How a print ended; the app wasn't running to see how")
             }
         }
     }

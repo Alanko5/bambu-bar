@@ -300,7 +300,7 @@ enum ReportParser {
             let pretty = String(format: "HMS_%04X_%04X_%04X_%04X", a >> 16, a & 0xFFFF, c >> 16, c & 0xFFFF)
             let severity = IssueSeverity(rawValue: Int(c >> 16)) ?? .common
             out.append(PrinterIssue(id: pretty, severity: severity,
-                                    message: catalog.hmsText(key) ?? "The printer reported \(pretty).",
+                                    message: catalog.hmsText(key) ?? String(localized: "The printer reported \(pretty).", comment: "An HMS code"),
                                     wikiURL: HMSCatalog.wikiURL(for: pretty)))
         }
         if let error = int(p["print_error"]), error != 0 {
@@ -313,7 +313,7 @@ enum ReportParser {
                 let severity: IssueSeverity = level == 0x4 ? .fatal : level == 0x8 ? .serious : .common
                 if !out.contains(where: { $0.id.hasSuffix(pretty) }) {
                     out.append(PrinterIssue(id: pretty, severity: severity,
-                                            message: catalog.errorText(key) ?? "The printer reported error \(pretty).",
+                                            message: catalog.errorText(key) ?? String(localized: "The printer reported error \(pretty).", comment: "An error code"),
                                             wikiURL: HMSCatalog.wikiURL(for: pretty)))
                 }
             }

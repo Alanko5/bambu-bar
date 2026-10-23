@@ -62,7 +62,7 @@ struct MainView: View {
             PrinterArt(status: store.status, model: store.config?.modelName, dimmed: !store.isOnline, animated: false)
                 .frame(width: 26, height: 31)
             VStack(alignment: .leading, spacing: 1) {
-                Text(store.isConfigured ? store.printerName : "No printer")
+                Text(store.isConfigured ? store.printerName : String(localized: "No printer"))
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                 Text(footerLine)
@@ -77,7 +77,7 @@ struct MainView: View {
     }
 
     private var footerLine: String {
-        guard store.isConfigured else { return "Set up to begin" }
+        guard store.isConfigured else { return String(localized: "Set up to begin") }
         guard let s = store.status, store.isOnline else { return store.linkSummary }
         if s.state.isActive { return "\(s.state.title) · \(s.progress)%" }
         return s.state.title
@@ -102,7 +102,7 @@ struct PageBackground: View {
 
 /// Page heading used by every section.
 struct PageHeader<Trailing: View>: View {
-    var title: String
+    var title: LocalizedStringKey
     var subtitle: String?
     @ViewBuilder var trailing: Trailing
 
@@ -122,7 +122,7 @@ struct PageHeader<Trailing: View>: View {
 }
 
 extension PageHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil) {
+    init(title: LocalizedStringKey, subtitle: String? = nil) {
         self.init(title: title, subtitle: subtitle) { EmptyView() }
     }
 }

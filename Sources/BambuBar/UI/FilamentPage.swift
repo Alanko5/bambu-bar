@@ -39,14 +39,17 @@ struct FilamentPage: View {
     }
 
     private var subtitle: String {
-        guard let s = store.status else { return "Spools in your AMS and on the external holder" }
+        guard let s = store.status else { return String(localized: "Spools in your AMS and on the external holder") }
         let loaded = s.allSpools.filter(\.isLoaded).count
         let grams = s.allSpools.compactMap(\.gramsLeft)
+        let count = String(localized: "\(loaded) spool(s) loaded")
         if !grams.isEmpty, !(s.state.isActive && s.activeSpool != nil) {
-            return "\(loaded) spool\(loaded == 1 ? "" : "s") loaded · \(Format.grams(grams.reduce(0, +))) of filament on hand"
+            return count + " · " + String(localized: "\(Format.grams(grams.reduce(0, +))) of filament on hand")
         }
-        if let active = s.activeSpool, s.state.isActive { return "\(loaded) loaded · printing with \(active.label) \(active.displayName)" }
-        return "\(loaded) spool\(loaded == 1 ? "" : "s") loaded"
+        if let active = s.activeSpool, s.state.isActive {
+            return count + " · " + String(localized: "printing with \(active.label) \(active.displayName)", comment: "The slot (A1), then the filament")
+        }
+        return count
     }
 
     @ViewBuilder
@@ -69,7 +72,7 @@ struct FilamentPage: View {
         .labelStyle(TightLabelStyle())
     }
 
-    private func empty(_ title: String, detail: String) -> some View {
+    private func empty(_ title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
         VStack(spacing: 8) {
             Image(systemName: "circle.circle").font(.system(size: 34)).foregroundStyle(.tertiary)
             Text(title).font(.system(size: 15, weight: .semibold))
@@ -102,11 +105,11 @@ struct SpoolCard: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(spool.isLoaded ? spool.displayName : "Empty slot")
+                Text(spool.isLoaded ? spool.displayName : String(localized: "Empty slot"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(spool.isLoaded ? .primary : .secondary)
                     .lineLimit(1)
-                Text(spool.isLoaded ? detail : "Load a spool to see it here")
+                Text(spool.isLoaded ? detail : String(localized: "Load a spool to see it here"))
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -158,13 +161,13 @@ struct SpoolCard: View {
     }
 
     private var help: String {
-        guard spool.isLoaded else { return "\(spool.label): empty" }
+        guard spool.isLoaded else { return String(localized: "\(spool.label): empty", comment: "AMS slot such as A1") }
         var lines = [[spool.brand, spool.displayName].compactMap { $0 }.joined(separator: " "),
                      [spool.colorName, "#" + String(spool.color.prefix(6))].compactMap { $0 }.joined(separator: " · ")]
-        if let range = spool.nozzleRange { lines.append("Prints at \(range.lowerBound)–\(range.upperBound) °C") }
+        if let range = spool.nozzleRange { lines.append(String(localized: "Prints at \(range.lowerBound)–\(range.upperBound) °C")) }
         if spool.remain == nil {
-            lines.append(spool.isExternal ? "The external holder can’t weigh the spool."
-                         : "Only Bambu Lab spools with an RFID tag report what’s left.")
+            lines.append(spool.isExternal ? String(localized: "The external holder can’t weigh the spool.")
+                         : String(localized: "Only Bambu Lab spools with an RFID tag report what’s left."))
         }
         return lines.joined(separator: "\n")
     }

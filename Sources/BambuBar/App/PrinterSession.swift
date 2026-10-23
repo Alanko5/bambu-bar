@@ -96,21 +96,21 @@ final class PrinterSession: Identifiable {
 
     var linkSummary: String {
         switch phase {
-        case .idle: return "Not connected"
-        case .connecting: return "Connecting…"
-        case .online: return "Connected"
-        case .offline: return "Offline"
-        case .unauthorized: return "Access code rejected"
-        case .certificate: return "Certificate not trusted"
-        case .localNetworkDenied: return "No local network access"
+        case .idle: return String(localized: "Not connected")
+        case .connecting: return String(localized: "Connecting…")
+        case .online: return String(localized: "Connected")
+        case .offline: return String(localized: "Offline")
+        case .unauthorized: return String(localized: "Access code rejected")
+        case .certificate: return String(localized: "Certificate not trusted")
+        case .localNetworkDenied: return String(localized: "No local network access")
         }
     }
 
     var linkDetail: String? {
         switch phase {
         case .offline(let reason): return reason
-        case .unauthorized: return "Check the access code on the printer's screen (Settings → Network) and enter it again."
-        case .certificate(let reason): return "The printer's TLS certificate couldn't be verified: \(reason)"
+        case .unauthorized: return String(localized: "Check the access code on the printer's screen (Settings → Network) and enter it again.")
+        case .certificate(let reason): return String(localized: "The printer's TLS certificate couldn't be verified: \(reason)")
         case .localNetworkDenied: return LocalNetwork.advice
         default: return nil
         }

@@ -153,12 +153,12 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .fleet: return "All Printers"
-        case .overview: return "Printer"
-        case .filament: return "Filament"
-        case .widgets: return "Widgets"
-        case .settings: return "Settings"
-        case .about: return "About"
+        case .fleet: return String(localized: "All Printers")
+        case .overview: return String(localized: "Printer")
+        case .filament: return String(localized: "Filament")
+        case .widgets: return String(localized: "Widgets")
+        case .settings: return String(localized: "Settings")
+        case .about: return String(localized: "About")
         }
     }
 

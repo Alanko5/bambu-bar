@@ -35,7 +35,7 @@ struct SetupPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             if adding {
-                PageHeader(title: "Add a Printer", subtitle: "Bambu Bar watches every printer you add; pick which one the menu bar shows in Settings.") {
+                PageHeader(title: "Add a Printer", subtitle: String(localized: "Bambu Bar watches every printer you add; pick which one the menu bar shows in Settings.")) {
                     Button("Cancel") { navigation.addingPrinter = false }
                 }
             } else {
@@ -75,9 +75,9 @@ struct SetupPage: View {
                 }
                 DisclosureGroup("Enter address manually", isExpanded: $manual) {
                     VStack(spacing: 10) {
-                        field("IP address", text: $host, prompt: "192.168.1.50")
-                        field("Serial number", text: $serial, prompt: "Optional")
-                        field("Name", text: $name, prompt: "Optional")
+                        field("IP address", text: $host, prompt: Text(verbatim: "192.168.1.50"))
+                        field("Serial number", text: $serial, prompt: Text("Optional"))
+                        field("Name", text: $name, prompt: Text("Optional"))
                         Text("Only the IP address is needed: it's on the printer's screen under Settings → Network. Bambu Bar reads the serial number from the printer.")
                             .font(.system(size: 11.5, weight: .regular))
                             .foregroundStyle(.secondary)
@@ -198,8 +198,8 @@ struct SetupPage: View {
 
     /// Several printers with saved codes: add them all in one go rather than one at a time.
     private func addAllCard(_ printers: [SlicerPrinter]) -> some View {
-        let sources = Set(printers.map(\.source)).sorted().joined(separator: " and ")
-        let models = Dictionary(grouping: printers) { PrinterModel.find(code: modelCode(for: $0), serial: $0.serial)?.name ?? "Other" }
+        let sources = ListFormatter.localizedString(byJoining: Set(printers.map(\.source)).sorted())
+        let models = Dictionary(grouping: printers) { PrinterModel.find(code: modelCode(for: $0), serial: $0.serial)?.name ?? String(localized: "Other", comment: "Printers of an unknown model") }
             .sorted { $0.value.count == $1.value.count ? $0.key < $1.key : $0.value.count > $1.value.count }
             .map { "\($0.value.count) \($0.key)" }
             .joined(separator: " · ")
@@ -210,7 +210,7 @@ struct SetupPage: View {
                 .frame(width: 30, height: 30)
                 .background(Circle().fill(Palette.accent.opacity(0.15)))
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(printers.count) printers in \(sources)").font(.system(size: 13, weight: .semibold))
+                Text(verbatim: String(localized: "\(printers.count) printers") + " · " + sources).font(.system(size: 13, weight: .semibold))
                 Text(models).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(2)
                 Text("Their access codes are saved there, so they can all be added at once.")
                     .font(.system(size: 11.5)).foregroundStyle(.secondary)
@@ -286,7 +286,7 @@ struct SetupPage: View {
                     .foregroundStyle(dropTargeted ? Palette.accent : .secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Bambu Studio on another Mac?").font(.system(size: 12, weight: .semibold))
-                    Text(LocalizedStringKey(importNote ?? "Drop its **BambuStudio.conf** here, or its BambuStudio folder. It's in **Library → Application Support → BambuStudio** in that user's home folder."))
+                    (importNote.map { Text(LocalizedStringKey($0)) } ?? Text("Drop its **BambuStudio.conf** here, or its BambuStudio folder. It's in **Library → Application Support → BambuStudio** in that user's home folder."))
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -309,9 +309,9 @@ struct SetupPage: View {
 
     private func chooseSettingsFile() {
         let panel = NSOpenPanel()
-        panel.title = "Choose Bambu Studio's settings"
-        panel.message = "Pick BambuStudio.conf, or the BambuStudio folder it's in."
-        panel.prompt = "Use"
+        panel.title = String(localized: "Choose Bambu Studio's settings")
+        panel.message = String(localized: "Pick BambuStudio.conf, or the BambuStudio folder it's in.")
+        panel.prompt = String(localized: "Use", comment: "Open panel button")
         panel.allowsMultipleSelection = false
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -325,7 +325,7 @@ struct SetupPage: View {
     private func importSettings(_ url: URL) {
         let count = store.importSlicerSettings(from: url)
         if count == 0 {
-            importNote = "No Bambu Studio or OrcaSlicer access codes found in \(url.lastPathComponent)."
+            importNote = String(localized: "No Bambu Studio or OrcaSlicer access codes found in \(url.lastPathComponent).")
             return
         }
         importNote = nil
@@ -340,7 +340,9 @@ struct SetupPage: View {
         }
         fillCodeFromSlicer()
         if codeSource == nil {
-            importNote = "\(url.lastPathComponent) doesn't know \(serial.isEmpty ? "this printer" : serial). Pick another printer or type the code."
+            importNote = serial.isEmpty
+                ? String(localized: "\(url.lastPathComponent) doesn't know this printer. Pick another printer or type the code.")
+                : String(localized: "\(url.lastPathComponent) doesn't know \(serial). Pick another printer or type the code.", comment: "A file name, then a serial number")
         }
     }
 
@@ -389,10 +391,10 @@ struct SetupPage: View {
         .panel(radius: 14, padding: 12, tint: isSelected ? Palette.accent : nil)
     }
 
-    private func field(_ title: String, text: Binding<String>, prompt: String) -> some View {
+    private func field(_ title: LocalizedStringKey, text: Binding<String>, prompt: Text) -> some View {
         HStack {
             Text(title).font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 110, alignment: .leading)
-            TextField(title, text: text, prompt: Text(prompt))
+            TextField(title, text: text, prompt: prompt)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 280)
                 .onChange(of: text.wrappedValue) { selected = nil }
@@ -436,10 +438,10 @@ struct SetupPage: View {
     private var missingStep: String? {
         if host.trimmingCharacters(in: .whitespaces).isEmpty {
             return newPrinters.isEmpty && slicerOnlyPrinters.isEmpty
-                ? "Bambu Bar hasn't found your printer yet. Type its IP address under \u{201C}Enter address manually\u{201D}."
-                : "Choose your printer above, or enter its address manually."
+                ? String(localized: "Bambu Bar hasn't found your printer yet. Type its IP address under \u{201C}Enter address manually\u{201D}.")
+                : String(localized: "Choose your printer above, or enter its address manually.")
         }
-        if code.trimmingCharacters(in: .whitespaces).count < 4 { return "Enter the printer's access code." }
+        if code.trimmingCharacters(in: .whitespaces).count < 4 { return String(localized: "Enter the printer's access code.") }
         return nil
     }
 

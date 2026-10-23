@@ -38,18 +38,18 @@ extension PrinterStore {
 
     /// "6 printing · 1 paused · 2 finished · 1 offline".
     var fleetSummary: String {
-        var counts: [(String, Int)] = []
-        func add(_ title: String, _ match: (PrinterSession) -> Bool) {
+        var counts: [String] = []
+        func add(_ title: (Int) -> String, _ match: (PrinterSession) -> Bool) {
             let n = sessions.filter(match).count
-            if n > 0 { counts.append((title, n)) }
+            if n > 0 { counts.append(title(n)) }
         }
-        add("need attention") { $0.attentionRank.0 == 0 }
-        add("printing") { $0.isOnline && [.printing, .preparing].contains($0.status?.state) }
-        add("paused") { $0.isOnline && $0.status?.state == .paused }
-        add("finished") { $0.isOnline && $0.status?.state == .finished }
-        add("ready") { $0.isOnline && $0.status?.state == .idle }
-        add("offline") { !$0.isOnline }
-        return counts.map { "\($0.1) \($0.0)" }.joined(separator: " · ")
+        add({ String(localized: "\($0) need attention", comment: "Printers") }) { $0.attentionRank.0 == 0 }
+        add({ String(localized: "\($0) printing", comment: "Printers") }) { $0.isOnline && [.printing, .preparing].contains($0.status?.state) }
+        add({ String(localized: "\($0) paused", comment: "Printers") }) { $0.isOnline && $0.status?.state == .paused }
+        add({ String(localized: "\($0) finished", comment: "Printers") }) { $0.isOnline && $0.status?.state == .finished }
+        add({ String(localized: "\($0) ready", comment: "Printers") }) { $0.isOnline && $0.status?.state == .idle }
+        add({ String(localized: "\($0) offline", comment: "Printers") }) { !$0.isOnline }
+        return counts.joined(separator: " · ")
     }
 }
 
@@ -60,7 +60,7 @@ struct FleetPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageHeader(title: "All Printers", subtitle: "\(store.sessions.count) printers · \(store.fleetSummary)") {
+            PageHeader(title: "All Printers", subtitle: String(localized: "\(store.sessions.count) printers") + " · " + store.fleetSummary) {
                 Button("Add Printer…") { MainWindow.addPrinter() }
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 14)], spacing: 14) {
@@ -128,7 +128,7 @@ struct StateChip: View {
 
     private var title: String {
         guard let s = session.status, session.isOnline else {
-            return session.phase == .connecting ? "Connecting" : "Offline"
+            return session.phase == .connecting ? String(localized: "Connecting") : String(localized: "Offline")
         }
         return s.stateTitle
     }
@@ -163,13 +163,13 @@ struct FleetProgress: View {
 
     private func timing(_ s: PrinterStatus) -> String {
         switch s.state {
-        case .finished: return "Done"
-        case .paused: return "\(Format.duration(minutes: s.remainingMinutes)) left · paused"
+        case .finished: return String(localized: "Done", comment: "A finished print")
+        case .paused: return String(localized: "\(Format.duration(minutes: s.remainingMinutes)) left · paused")
         default:
             guard let end = s.estimatedEnd else { return s.stageText ?? "" }
             let left = Format.duration(minutes: s.remainingMinutes)
             // The finish time only when it's today; "tomorrow 06:01" doesn't fit beside the percentage.
-            return Calendar.current.isDateInToday(end) ? "\(left) · \(Format.finish(end))" : "\(left) left"
+            return Calendar.current.isDateInToday(end) ? "\(left) · \(Format.finish(end))" : String(localized: "\(left) left", comment: "Time left, such as “2h 05m left”")
         }
     }
 }

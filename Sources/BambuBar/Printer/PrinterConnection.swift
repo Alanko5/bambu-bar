@@ -193,9 +193,9 @@ final class PrinterConnection {
             case .localNetworkDenied:
                 phase = .localNetworkDenied
             case .timedOut:
-                phase = .offline("The printer stopped answering.")
+                phase = .offline(String(localized: "The printer stopped answering."))
             case .closed, .malformed, .refused:
-                phase = .offline("The connection to the printer closed.")
+                phase = .offline(String(localized: "The connection to the printer closed."))
             }
             scheduleReconnect()
         }
@@ -232,7 +232,7 @@ final class PrinterConnection {
         switch phase {
         case .online:
             if silence > 95 {
-                phase = .offline("The printer stopped sending updates.")
+                phase = .offline(String(localized: "The printer stopped sending updates."))
                 reconnectSoon(after: 0)
             } else if silence > 60 || Date().timeIntervalSince(lastPushall) > 300 {
                 requestFullReport()

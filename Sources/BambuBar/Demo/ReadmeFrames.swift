@@ -59,7 +59,7 @@ enum ReadmeFrames {
         if let pauseAt, t >= pauseAt {
             s.state = .paused
             s.stageID = 6
-            s.issues = [PrinterIssue(id: "HMS_0700_2300_0001_0004", severity: .serious,
+            s.issues = [PrinterIssue(id: "HMS_0700_2300_0002_0001", severity: .serious,
                                      message: "AMS A slot 4 filament has run out. Insert a new spool to continue.",
                                      wikiURL: HMSCatalog.wikiURL(for: ""))]
         }
