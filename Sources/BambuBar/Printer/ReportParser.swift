@@ -89,10 +89,13 @@ enum ReportParser {
 
         // Temperatures: the newer `device` block packs current (low 16 bits) and target (high 16 bits).
         let device = p["device"] as? [String: Any]
-        let extruders = (device?["extruder"] as? [String: Any])?["info"] as? [[String: Any]]
-        if let packed = int(extruders?.first?["temp"]) {
+        let extruders = extruders(device)
+        if let packed = int(extruders.byID[0]?["temp"]) {
             s.nozzle = unpack(packed)
-            if let extruders, extruders.count > 1, let second = int(extruders[1]["temp"]) { s.secondNozzle = unpack(second) }
+            if let left = int(extruders.byID[1]?["temp"]) {
+                s.secondNozzle = unpack(left)
+                s.leftNozzleInUse = extruders.current == 1
+            }
         } else {
             s.nozzle = Temperature(current: double(p["nozzle_temper"]) ?? 0, target: double(p["nozzle_target_temper"]) ?? 0)
         }
@@ -209,9 +212,9 @@ enum ReportParser {
             s.externalSpool = ext
         }
 
-        // Active slot: the extruder's `snow` (unit << 8 | slot) on newer firmware, else `tray_now`.
-        let extruders = (device?["extruder"] as? [String: Any])?["info"] as? [[String: Any]]
-        if let snow = int(extruders?.first?["snow"]), snow != 0xFFFF {
+        // Active slot: the printing extruder's `snow` (unit << 8 | slot) on newer firmware, else `tray_now`.
+        let extruders = extruders(device)
+        if let snow = int(extruders.byID[extruders.current]?["snow"]), snow != 0xFFFF {
             let unit = snow >> 8, slot = snow & 0xFF
             if unit == 254 || unit == 255 {
                 s.activeSpoolID = slot == 255 ? nil : Spool.externalID
@@ -340,6 +343,17 @@ enum ReportParser {
         // Bambu Studio turns spaces into underscores when it names the job after the project file.
         if !n.contains(" ") { n = n.replacingOccurrences(of: "_", with: " ") }
         return n
+    }
+
+    /// The newer firmware's `device.extruder` block. Bambu Studio keys each extruder by its `id` (0 is the right
+    /// nozzle, 1 the left on two-nozzle models), not by its place in the list; bits 4-7 of `state` say which one
+    /// is printing.
+    private static func extruders(_ device: [String: Any]?) -> (byID: [Int: [String: Any]], current: Int) {
+        let root = device?["extruder"] as? [String: Any]
+        var byID: [Int: [String: Any]] = [:]
+        for (i, e) in ((root?["info"] as? [[String: Any]]) ?? []).enumerated() { byID[int(e["id"]) ?? i] = e }
+        let current = int(root?["state"]).map { ($0 >> 4) & 0xF } ?? 0
+        return (byID, byID[current] == nil ? 0 : current)
     }
 
     private static func unpack(_ packed: Int) -> Temperature {

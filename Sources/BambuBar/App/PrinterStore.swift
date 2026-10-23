@@ -118,7 +118,10 @@ final class PrinterStore {
             // `--connect <host> <serial> <code>`: a throwaway session (the local emulator, a borrowed printer).
             // Nothing is saved: not the printer, not the access code, not the history.
             isDemo = true
-            let session = add(PrinterConfig(host: dev.host, serial: dev.serial, name: "P2S Emulator", modelCode: "N7"))
+            // The model follows the serial's prefix (a P2S if it's not one Bambu Lab uses).
+            let model = PrinterModel.find(code: "", serial: dev.serial) ?? PrinterModel.find(code: "N7")
+            let session = add(PrinterConfig(host: dev.host, serial: dev.serial, name: "\(model?.name ?? "P2S") Emulator",
+                                            modelCode: model?.code ?? "N7"))
             session.start(accessCode: dev.code, insecure: insecureTLS)
             writeSnapshot(force: true)
             return

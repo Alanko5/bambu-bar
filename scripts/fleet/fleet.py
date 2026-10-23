@@ -78,8 +78,8 @@ PRINTERS = [
     ("H2S Prototype", "O1S", "PREPARE", "Enclosure Lid", 0, 150, 0, [IVORY, CHARCOAL, ORANGE, None]),
     ("P1P Corner", "C11", "IDLE", "", 0, 0, None, [ESUN_RED]),
     ("A1 Desk", "N2S", "FINISH", "Desk Organizer", 100, 120, 3, [GRASS, SUNLU_WHITE, COBALT, ORANGE]),
-    ("Mini 1", "N1", "RUNNING", "Keychain Batch", 88, 40, 1, [TURQ, CHARCOAL, None, SUNLU_PINK]),
-    ("Mini 2", "N1", "FAILED", "3DBenchy", 23, 50, 0, [ORANGE, None, None, None]),
+    ("X2D Shop", "N6", "RUNNING", "R40", 44, 240, 0, [ABS_AZURE, CHARCOAL, PETG_GRAY, None]),
+    ("Mini", "N1", "FAILED", "3DBenchy", 23, 50, 0, [ORANGE, None, None, None]),
     ("H2C Batch", "O1C", "RUNNING", "Gridfinity Bins", 35, 600, 0, [ORANGE, IVORY, COBALT, GRASS]),
     ("Spare P1S", "C12", "OFFLINE", "", 0, 0, None, []),
 ]
@@ -214,11 +214,20 @@ class Printer:
         current = nozzle_target or 28
         extruder.update({"id": 0, "temp": (nozzle_target << 16) | current, "snow": snow})
         device["extruder"]["info"] = [extruder]
+        device["extruder"]["state"] = 1
         if self.nozzles == 2:
+            # Bambu Studio keys extruders by `id` (0 right, 1 left), not list order, and `state` bits 4-7 name the
+            # one printing. The X2D lists its left nozzle first and prints with it here, as a user's X2D did.
             second = copy.deepcopy(extruder)
             idle_target = 170 if printing else 0
             second.update({"id": 1, "temp": (idle_target << 16) | (idle_target or 27), "snow": 0xFFFF})
-            device["extruder"]["info"].append(second)
+            if self.code == "N6":
+                extruder["id"], second["id"] = 1, 0
+                device["extruder"]["info"] = [extruder, second]
+                device["extruder"]["state"] = (1 << 4) | 2
+            else:
+                device["extruder"]["info"].append(second)
+                device["extruder"]["state"] = 2
         device["bed"]["info"]["temp"] = (bed_target << 16) | (bed_target or 24)
         chamber_target = 45 if self.heater and material == "PA6-CF" and printing else 0
         device["ctc"]["info"]["temp"] = (chamber_target << 16) | (chamber_target or (34 if printing else 26))
@@ -300,7 +309,7 @@ class Printer:
         target = info[0]["temp"] >> 16
         if state == "PREPARE":
             current = min(target, (info[0]["temp"] & 0xFFFF) + 4)
-            fields = {"device": {"extruder": {"info": [{"id": 0, "temp": (target << 16) | current}]}}}
+            fields = {"device": {"extruder": {"info": [{"id": info[0]["id"], "temp": (target << 16) | current}]}}}
             if current >= target:
                 self.state = "RUNNING"
                 fields.update({"gcode_state": "RUNNING", "stg_cur": 0, "mc_percent": 1})
@@ -311,7 +320,7 @@ class Printer:
             total = r.get("total_layer_num") or 1
             fields = {"mc_percent": pct, "layer_num": int(total * self.progress / 100),
                       "mc_remaining_time": max(0, int(self.job_minutes * (1 - self.progress / 100))),
-                      "device": {"extruder": {"info": [{"id": 0, "temp": (target << 16) | (target + random.choice([-1, 0, 0, 1]))}]}}}
+                      "device": {"extruder": {"info": [{"id": info[0]["id"], "temp": (target << 16) | (target + random.choice([-1, 0, 0, 1]))}]}}}
             if pct >= 100:
                 self.state = "FINISH"
                 self.finished_at = time.time()

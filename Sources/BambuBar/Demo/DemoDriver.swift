@@ -54,6 +54,7 @@ final class DemoDriver {
             status.totalLayers = 300
             status.remainingMinutes = 188
             status.secondNozzle = Temperature(current: 170, target: 170)
+            status.leftNozzleInUse = false
             status.chamber = 41
         case 4:
             status.jobName = "Keychain Batch"
