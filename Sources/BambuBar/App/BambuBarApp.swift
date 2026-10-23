@@ -8,7 +8,7 @@ struct BambuBarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuPanel()
+            MenuPanelHost()
                 .environment(store)
         } label: {
             MenuBarLabel()
@@ -190,6 +190,7 @@ final class Navigation {
 @MainActor
 enum MainWindow {
     private static var window: NSWindow?
+    private static var closeObserver: NSObjectProtocol?
 
     static func show(_ section: AppSection? = nil, setup: DiscoveredPrinter? = nil) {
         if let section { Navigation.shared.section = section }
@@ -213,6 +214,17 @@ enum MainWindow {
             w.center()
             w.setFrameAutosaveName("BambuBarMain")
             window = w
+            // A closed window would keep its views updating with every report (and the printer model
+            // animating), so it's let go and built again on the next open.
+            closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w,
+                                                                   queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+                    closeObserver = nil
+                    window = nil
+                    DispatchQueue.main.async { w.contentViewController = nil }
+                }
+            }
         }
         NSApp.setActivationPolicy(.regular)
         window?.makeKeyAndOrderFront(nil)

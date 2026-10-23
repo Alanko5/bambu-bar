@@ -11,16 +11,13 @@ struct MenuBarLabel: View {
         let s = session?.status
         let online = session?.isOnline ?? false
         let active = online && (s?.state.isActive ?? false)
-        HStack(spacing: 4) {
-            Image(nsImage: MenuBarIcon.image(state: online ? (s?.canceled == true ? .idle : s?.state) : nil, progress: Double(s?.progress ?? 0) / 100,
-                                             alert: online && (s?.mostSevereIssue?.severity ?? .info) <= .serious,
-                                             offline: store.isConfigured && !online))
-            if active, let s, let text = text(s) {
-                Text(text).monospacedDigit()
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText(session))
+        // Reports arrive every second or so; the label below redraws only when what it shows changes.
+        MenuBarLabelContent(icon: MenuBarIcon.image(state: online ? (s?.canceled == true ? .idle : s?.state) : nil,
+                                                    progress: Double(s?.progress ?? 0) / 100,
+                                                    alert: online && (s?.mostSevereIssue?.severity ?? .info) <= .serious,
+                                                    offline: store.isConfigured && !online),
+                            text: active ? s.flatMap(text) : nil,
+                            accessibility: accessibilityText(session))
     }
 
     private func text(_ s: PrinterStatus) -> String? {
@@ -44,6 +41,24 @@ struct MenuBarLabel: View {
         let name = store.hasMultiplePrinters ? "\(session.config.name), " : ""
         if s.state.isActive { return "Bambu Bar, \(name)\(s.state.title) \(s.progress) percent" }
         return "Bambu Bar, \(name)\(s.stateTitle)"
+    }
+}
+
+private struct MenuBarLabelContent: View, Equatable {
+    /// One cached image per look, so the same look compares equal.
+    var icon: NSImage
+    var text: String?
+    var accessibility: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(nsImage: icon)
+            if let text {
+                Text(text).monospacedDigit()
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibility)
     }
 }
 

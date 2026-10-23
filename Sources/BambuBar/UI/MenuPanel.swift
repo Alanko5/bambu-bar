@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// The menu bar panel's window lives on after it closes, and SwiftUI would go on laying it out and drawing it
+/// (animations and all) with every report. Closed, it holds an empty frame of the same size instead.
+struct MenuPanelHost: View {
+    @State private var isOpen = true
+    @State private var size: CGSize?
+
+    var body: some View {
+        ZStack {
+            if isOpen {
+                MenuPanel()
+                    .onGeometryChange(for: CGSize.self, of: \.size) { size = $0 }
+            } else {
+                Color.clear.frame(width: size?.width, height: size?.height)
+            }
+        }
+        .onAppear { isOpen = true }
+        .onDisappear { isOpen = false }
+    }
+}
+
 /// The panel under the menu bar icon: everything about the print at a glance, plus the common controls.
 struct MenuPanel: View {
     @Environment(PrinterStore.self) private var store

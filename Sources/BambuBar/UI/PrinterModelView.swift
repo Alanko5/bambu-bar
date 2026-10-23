@@ -61,8 +61,7 @@ private struct PrinterModelCanvas: NSViewRepresentable {
     var art: PrinterArt
 
     func makeNSView(context: Context) -> PrinterSceneView {
-        let view = PrinterSceneView(frame: .zero)
-        view.load(art.shape)
+        let view = PrinterSceneView.reused(art.shape)
         view.apply(art)
         return view
     }
@@ -70,6 +69,10 @@ private struct PrinterModelCanvas: NSViewRepresentable {
     func updateNSView(_ view: PrinterSceneView, context: Context) {
         if view.shape != art.shape { view.load(art.shape) }
         view.apply(art)
+    }
+
+    static func dismantleNSView(_ view: PrinterSceneView, coordinator: ()) {
+        PrinterSceneView.keep(view)
     }
 }
 
@@ -89,7 +92,13 @@ final class PrinterSceneView: SCNView {
     private var head: (node: SCNNode, base: SCNVector3)?
     /// Height of the finished print, in model units.
     private var partHeight: CGFloat = 0
+    /// The printer is printing, so the toolhead should move…
     private var moving = false
+    /// …and it does while the view is on screen. Closed windows and the hidden menu bar panel stay alive,
+    /// and SceneKit keeps drawing for as long as an action runs.
+    private var animating = false
+    private var onScreen = false
+    private var occlusionObserver: NSObjectProtocol?
     /// The A series has no chamber light to switch.
     private var hasLamp = false
 
@@ -105,7 +114,9 @@ final class PrinterSceneView: SCNView {
         super.init(frame: frame, options: options)
         backgroundColor = .clear
         antialiasingMode = .multisampling4X
-        preferredFramesPerSecond = 30
+        // The toolhead's eased moves look the same at 20 fps, and each frame costs the same CPU whatever
+        // the antialiasing or shadows.
+        preferredFramesPerSecond = 20
         autoenablesDefaultLighting = false
         allowsCameraControl = false
         scene = Self.studio(pivot: pivot, lamp: lampLight)
@@ -114,6 +125,29 @@ final class PrinterSceneView: SCNView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// Loading a model takes a moment, and the menu bar panel drops its contents each time it closes,
+    /// so views leaving the screen wait here for the next one.
+    private static var spares: [PrinterShape: PrinterSceneView] = [:]
+
+    static func reused(_ shape: PrinterShape) -> PrinterSceneView {
+        if let view = spares.removeValue(forKey: shape) { return view }
+        let view = PrinterSceneView(frame: .zero)
+        view.load(shape)
+        return view
+    }
+
+    static func keep(_ view: PrinterSceneView) {
+        guard let shape = view.shape else { return }
+        view.yaw = restYaw
+        view.pitch = restPitch
+        view.orient()
+        spares[shape] = view
+    }
+
+    deinit {
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+    }
 
     override var isOpaque: Bool { false }
     override var acceptsFirstResponder: Bool { true }
@@ -226,6 +260,7 @@ final class PrinterSceneView: SCNView {
         bed = track("Bed")
         head = track("Toolhead")
         moving = false
+        animating = false
 
         hasLamp = false
         if let lamp = root.childNode(withName: "Lamp", recursively: true) {
@@ -320,18 +355,40 @@ final class PrinterSceneView: SCNView {
             gantry.node.position = gantry.base - parent.convertVector(SCNVector3(0, rest, 0), from: content)
         }
 
-        let shouldMove = art.animated && art.state == .printing && !art.dimmed
-        if scripted {
-            moving = shouldMove
-            return
-        }
-        if shouldMove != moving {
-            moving = shouldMove
-            shouldMove ? startMotion() : stopMotion()
-        }
-        isPlaying = moving
-        rendersContinuously = moving
+        moving = art.animated && art.state == .printing && !art.dimmed
+        if scripted { return }
+        updatePlayback()
         needsDisplay = true
+    }
+
+    // MARK: - Visibility
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard !scripted else { return }
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+        occlusionObserver = window.map { window in
+            NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window,
+                                                   queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updatePlayback() }
+            }
+        }
+        updatePlayback()
+    }
+
+    /// Animates (at the display's frame rate) only while printing and on screen; otherwise SceneKit draws
+    /// a frame when something changes, and nothing at all while hidden.
+    private func updatePlayback() {
+        let visible = window?.occlusionState.contains(.visible) ?? false
+        if visible && !onScreen { needsDisplay = true }
+        onScreen = visible
+        let animate = moving && visible
+        if animate != animating {
+            animating = animate
+            animate ? startMotion() : stopMotion(easing: visible)
+        }
+        if isPlaying != animate { isPlaying = animate }
+        if rendersContinuously != animate { rendersContinuously = animate }
     }
 
     private func shownFraction(_ art: PrinterArt) -> Double {
@@ -386,10 +443,15 @@ final class PrinterSceneView: SCNView {
                                  antialiasingMode: .multisampling4X)
     }
 
-    private func stopMotion() {
+    /// Parks the toolhead (and bed): eased back when the print stops in view, at once when the view hides.
+    private func stopMotion(easing: Bool) {
         for tracked in [head, bed].compactMap({ $0 }) {
             tracked.node.removeAction(forKey: "print")
-            tracked.node.runAction(.move(to: tracked.base, duration: 0.4))
+            if easing {
+                tracked.node.runAction(.move(to: tracked.base, duration: 0.4))
+            } else {
+                tracked.node.position = tracked.base
+            }
         }
     }
 

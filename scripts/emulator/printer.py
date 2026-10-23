@@ -135,8 +135,13 @@ class Printer:
         cur, tgt = nozzle & 0xFFFF, nozzle >> 16
         if state == "PREPARE":
             cur = min(tgt, cur + 6)
-            fields = {"device": {"extruder": {"info": [{"id": 0, "temp": (tgt << 16) | cur}]}}, "nozzle_temper": float(cur)}
-            if cur >= tgt:
+            bed = r["device"]["bed"]["info"]["temp"]
+            bed_cur, bed_tgt = bed & 0xFFFF, bed >> 16
+            bed_cur = min(bed_tgt, bed_cur + 1)
+            fields = {"device": {"extruder": {"info": [{"id": 0, "temp": (tgt << 16) | cur}]},
+                                 "bed": {"info": {"temp": (bed_tgt << 16) | bed_cur}}},
+                      "nozzle_temper": float(cur), "bed_temper": float(bed_cur)}
+            if cur >= tgt and bed_cur >= bed_tgt:
                 fields.update({"gcode_state": "RUNNING", "stg_cur": 0, "mc_percent": 1})
             self.delta(fields)
         elif state == "RUNNING":
