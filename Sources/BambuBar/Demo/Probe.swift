@@ -62,15 +62,15 @@ enum Probe {
 
     /// `--probe-camera <host> <serial> <access-code> [seconds] [--jpeg|--rtsp] [--model <name>]`: opens the camera
     /// like the app does, logs the handshake (certificate, RTSP replies, SDP) and the frames, decodes the first one
-    /// and saves it as a PNG in the temporary folder. Without `--jpeg`/`--rtsp`, `--model` (default P2S) decides.
+    /// and saves it as a PNG in the temporary folder. Without `--jpeg`/`--rtsp`, the model decides (a P2S if unknown).
     static var cameraArguments: (host: String, serial: String, code: String, seconds: Double, transport: CameraTransport)? {
         let a = CommandLine.arguments
         guard let i = a.firstIndex(of: "--probe-camera"), i + 3 < a.count else { return nil }
         let seconds = i + 4 < a.count ? Double(a[i + 4]) ?? 15 : 15
-        // `--model` takes a name ("P1S") or an SSDP code ("C12"), like `--connect`.
-        let model = a.firstIndex(of: "--model").flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil } ?? "P2S"
-        let named = PrinterModel.name(for: model)
-        var transport = CameraTransport.forModel(named == "Bambu Lab printer" ? model : named)
+        // `--model` takes a name ("P1S") or a model code ("C12"); without it the serial says.
+        let name = a.firstIndex(of: "--model").flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil }
+        let model = PrinterModel.named(name) ?? PrinterModel.find(code: "", serial: a[i + 2])
+        var transport = CameraTransport.forModel(model?.name ?? "P2S")
         if a.contains("--jpeg") { transport = .jpeg }
         if a.contains("--rtsp") { transport = .rtsps }
         return (a[i + 1], a[i + 2], a[i + 3], seconds, transport)
@@ -157,7 +157,7 @@ enum Probe {
         var lines = [
             "\(s.state.title), stage \(s.stageID.map(String.init) ?? "-") (\(s.stageText ?? "-"))",
             "job \"\(s.jobName)\" \(s.progress)% layer \(s.layer)/\(s.totalLayers), \(s.remainingMinutes) min left",
-            "nozzle \(s.nozzle.current)/\(s.nozzle.target) bed \(s.bed.current)/\(s.bed.target) chamber \(s.chamber.map { "\($0)" } ?? "-")",
+            "nozzle \(s.nozzle.current)/\(s.nozzle.target)\(s.secondNozzle.map { " left \($0.current)/\($0.target)" } ?? "")\(s.leftNozzleInUse.map { $0 ? " (left in use)" : " (right in use)" } ?? "") bed \(s.bed.current)/\(s.bed.target) chamber \(s.chamber.map { "\($0)" } ?? "-")",
             "fans part \(s.partFan ?? -1)% aux \(s.auxFan ?? -1)% exhaust \(s.exhaustFan ?? -1)%  speed \(s.speed.title)",
             "light \(s.chamberLightOn.map { $0 ? "on" : "off" } ?? "-") door \(s.doorOpen.map { $0 ? "open" : "closed" } ?? "-") wifi \(s.wifiSignal ?? 0) dBm",
             "controls locked: \(s.controlsLocked)  firmware \(s.firmware ?? "-")  nozzle \(s.nozzleDiameter ?? 0) \(s.nozzleType ?? "-")",

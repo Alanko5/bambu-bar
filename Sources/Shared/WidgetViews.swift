@@ -178,7 +178,7 @@ struct SmallWidgetView: View {
 
     private func temps(_ s: PrinterStatus) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            tempLine("flame.fill", s.nozzle.current, Palette.nozzle, s.nozzle.isHeating)
+            tempLine("flame.fill", s.activeNozzle.current, Palette.nozzle, s.activeNozzle.isHeating)
             tempLine("heat.waves", s.bed.current, Palette.bed, s.bed.isHeating)
             if let c = s.chamber { tempLine("thermometer.medium", c, Palette.chamber, false) }
         }
@@ -229,7 +229,8 @@ struct SmallWidgetView: View {
         case .printing:
             return [w.finishText.map { "Done \($0)" }, layers].compactMap { $0 }.joined(separator: " · ")
         case .preparing:
-            return s.nozzle.isHeating ? "Nozzle \(Int(s.nozzle.current))° → \(Int(s.nozzle.target))°" : "Starting soon"
+            let n = s.activeNozzle
+            return n.isHeating ? "\(s.activeNozzleTitle) \(Int(n.current))° → \(Int(n.target))°" : "Starting soon"
         case .paused:
             return [layers.map { "Layer \($0)" }, "\(s.progress)%"].compactMap { $0 }.joined(separator: " · ")
         case .finished:
@@ -269,7 +270,7 @@ struct SmallWidgetDial: View {
                     }
                 }
             case .preparing?:
-                ProgressRing(progress: s.map { $0.nozzle.target > 0 ? min(1, $0.nozzle.current / $0.nozzle.target) : 0.1 } ?? 0.1,
+                ProgressRing(progress: s.map { $0.activeNozzle.target > 0 ? min(1, $0.activeNozzle.current / $0.activeNozzle.target) : 0.1 } ?? 0.1,
                              tint: Palette.preparing, lineWidth: 6.5)
                     .widgetAccentableCompat()
                 Image(systemName: "flame.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.nozzle)
@@ -374,13 +375,15 @@ struct LargeWidgetView: View {
                 .frame(height: 118)
             if let s = w.status {
                 HStack(spacing: 8) {
-                    WidgetTempTile(title: "Nozzle", symbol: "flame.fill", value: s.nozzle.current, target: s.nozzle.target, tint: Palette.nozzle)
+                    WidgetTempTile(title: s.activeNozzleTitle, symbol: "flame.fill", value: s.activeNozzle.current, target: s.activeNozzle.target,
+                                   tint: Palette.nozzle)
                     WidgetTempTile(title: "Bed", symbol: "heat.waves", value: s.bed.current, target: s.bed.target, tint: Palette.bed)
                     if let chamber = s.chamber {
                         WidgetTempTile(title: "Chamber", symbol: "thermometer.medium", value: chamber,
                                        target: s.chamberTarget, tint: Palette.chamber)
-                    } else if let left = s.secondNozzle {
-                        WidgetTempTile(title: "Left", symbol: "flame.fill", value: left.current, target: left.target, tint: Palette.nozzle)
+                    } else if let other = s.idleNozzle {
+                        WidgetTempTile(title: s.idleNozzleTitle, symbol: "flame.fill", value: other.current, target: other.target,
+                                       tint: Palette.nozzle)
                     } else if let fan = s.partFan {
                         WidgetStatTile(title: "Part fan", symbol: "fan.fill", value: "\(fan)%",
                                        tint: Palette.chamber, active: fan > 0)
@@ -529,7 +532,7 @@ struct WidgetTemps: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            item("flame.fill", status.nozzle.current, status.nozzle.target, Palette.nozzle)
+            item("flame.fill", status.activeNozzle.current, status.activeNozzle.target, Palette.nozzle)
             item("heat.waves", status.bed.current, status.bed.target, Palette.bed)
             if let c = status.chamber { item("thermometer.medium", c, 0, Palette.chamber) }
             Spacer(minLength: 0)

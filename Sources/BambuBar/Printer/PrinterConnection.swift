@@ -31,6 +31,8 @@ final class PrinterConnection {
         case offline(String)
         case unauthorized
         case certificate(String)
+        /// macOS keeps Bambu Bar off the local network; retried, so it reconnects once access is turned on.
+        case localNetworkDenied
     }
 
     var onPhase: ((Phase) -> Void)?
@@ -188,6 +190,8 @@ final class PrinterConnection {
                 return
             case .unreachable(let reason):
                 phase = .offline(reason)
+            case .localNetworkDenied:
+                phase = .localNetworkDenied
             case .timedOut:
                 phase = .offline("The printer stopped answering.")
             case .closed, .malformed, .refused:

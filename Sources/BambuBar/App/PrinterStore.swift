@@ -30,6 +30,8 @@ final class PrinterStore {
     private(set) var selectedSerial: String?
     private(set) var history: [JobRecord] = []
     private(set) var discovered: [DiscoveredPrinter] = []
+    /// The search for printers can't get out: macOS's Local Network permission is off or not answered yet.
+    private(set) var discoveryBlocked = false
     /// Printers whose access code a slicer already knows (this Mac's Bambu Studio or OrcaSlicer, or a settings
     /// file imported from another Mac this session).
     private(set) var slicerPrinters: [SlicerPrinter] = []
@@ -118,6 +120,7 @@ final class PrinterStore {
 
     func start() {
         discovery.onFound = { [weak self] printer in self?.found(printer) }
+        discovery.onBlocked = { [weak self] blocked in self?.discoveryBlockedChanged(blocked) }
 
         if let scenario = DemoDriver.requestedScenario {
             startDemo(scenario)
@@ -127,11 +130,10 @@ final class PrinterStore {
             // `--connect <host> <serial> <code>`: a throwaway session (the local emulator, a borrowed printer).
             // Nothing is saved: not the printer, not the access code, not the history.
             isDemo = true
-            // `--model <code>` (SSDP code, e.g. C12 for a P1S) picks the drawing and camera transport; default P2S.
-            let args = CommandLine.arguments
-            let model = args.firstIndex(of: "--model").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "N7"
-            let name = model == "N7" ? "P2S Emulator" : PrinterModel.name(for: model, serial: dev.serial)
-            let session = add(PrinterConfig(host: dev.host, serial: dev.serial, name: name, modelCode: model))
+            // The model follows the serial's prefix (a P2S if it's not one Bambu Lab uses).
+            let model = PrinterModel.find(code: "", serial: dev.serial) ?? PrinterModel.find(code: "N7")
+            let session = add(PrinterConfig(host: dev.host, serial: dev.serial, name: "\(model?.name ?? "P2S") Emulator",
+                                            modelCode: model?.code ?? "N7"))
             session.start(accessCode: dev.code, insecure: insecureTLS)
             writeSnapshot(force: true)
             return
@@ -356,6 +358,21 @@ final class PrinterStore {
             saveConfigs()
             session.restart()
         }
+    }
+
+    /// Local network access is off, as far as the search or any connection can tell.
+    var localNetworkBlocked: Bool { discoveryBlocked || sessions.contains { $0.phase == .localNetworkDenied } }
+
+    private func discoveryBlockedChanged(_ blocked: Bool) {
+        discoveryBlocked = blocked
+        // Access just came back: reconnect now rather than at the end of the back-off.
+        if !blocked { for session in sessions where session.phase == .localNetworkDenied { session.refresh() } }
+    }
+
+    /// The serial of the printer at `host` (an IP address, or `host:port` for a mock printer), read from its certificate.
+    func identifyPrinter(at host: String) async -> Result<String, PrinterIdentity.Failure> {
+        let endpoint = PrinterConfig(host: host, serial: "", name: "", modelCode: "").endpoint
+        return await PrinterIdentity.serial(host: endpoint.host, port: endpoint.port, insecure: insecureTLS)
     }
 
     // MARK: - Access codes from slicers
@@ -589,7 +606,7 @@ final class PrinterStore {
         case .online: link = .online
         case .connecting: link = session.status == nil ? .connecting : .online
         case .unauthorized: link = .unauthorized
-        case .idle, .offline, .certificate: link = .offline
+        case .idle, .offline, .certificate, .localNetworkDenied: link = .offline
         }
         return SharedSnapshot(serial: session.id, printerName: session.config.name, model: session.config.modelName,
                               link: link, status: session.status,

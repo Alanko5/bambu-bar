@@ -24,6 +24,12 @@ struct SetupPage: View {
     @State private var alternativeCodes: [String] = []
     @State private var importNote: String?
     @State private var dropTargeted = false
+    /// Reading the serial from the printer at a typed address.
+    @State private var identifying = false
+    /// Why the last Connect didn't get anywhere (nothing at the address, not a Bambu printer…).
+    @State private var problem: String?
+    /// Connect was tried (Return in the code field) before the printer and code were both there.
+    @State private var attempted = false
     @FocusState private var codeFocused: Bool
 
     var body: some View {
@@ -45,7 +51,9 @@ struct SetupPage: View {
                     Button("Search Again") { store.searchForPrinters() }
                         .controlSize(.small)
                 }
-                if newPrinters.isEmpty && !manual {
+                if store.localNetworkBlocked {
+                    localNetworkNotice
+                } else if newPrinters.isEmpty && !manual {
                     HStack(spacing: 10) {
                         Image(systemName: "wifi").foregroundStyle(.secondary)
                         Text("Looking for printers on this network. Printers announce themselves every few seconds; make sure yours is on and on the same network as this Mac.")
@@ -68,8 +76,13 @@ struct SetupPage: View {
                 DisclosureGroup("Enter address manually", isExpanded: $manual) {
                     VStack(spacing: 10) {
                         field("IP address", text: $host, prompt: "192.168.1.50")
-                        field("Serial number", text: $serial, prompt: "22E…")
-                        field("Name", text: $name, prompt: "My P2S")
+                        field("Serial number", text: $serial, prompt: "Optional")
+                        field("Name", text: $name, prompt: "Optional")
+                        Text("Only the IP address is needed: it's on the printer's screen under Settings → Network. Bambu Bar reads the serial number from the printer.")
+                            .font(.system(size: 11.5, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.top, 8)
                 }
@@ -100,8 +113,8 @@ struct SetupPage: View {
             HStack(spacing: 12) {
                 Button(action: connect) {
                     HStack(spacing: 6) {
-                        if store.phase == .connecting { ProgressView().controlSize(.small).tint(.white) }
-                        Text(store.phase == .connecting ? "Connecting…" : "Connect")
+                        if identifying || store.phase == .connecting { ProgressView().controlSize(.small).tint(.white) }
+                        Text(identifying ? "Finding Printer…" : store.phase == .connecting ? "Connecting…" : "Connect")
                     }
                     .frame(width: 150)
                 }
@@ -109,10 +122,15 @@ struct SetupPage: View {
                 .frame(width: 150)
                 .disabled(!canConnect)
                 .keyboardShortcut(.defaultAction)
-                if let detail = store.linkDetail {
+                if let detail = problem ?? store.linkDetail {
                     Label(detail, systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.paused)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let missing = missingStep, attempted || !code.isEmpty {
+                    Label(missing, systemImage: "arrow.up.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -123,12 +141,28 @@ struct SetupPage: View {
         }
         .onChange(of: store.slicerPrinters) { fillCodeFromSlicer() }
         .onChange(of: navigation.setupCandidate) { adoptCandidate() }
+        .onChange(of: host) { problem = nil }
+        .onChange(of: code) { problem = nil }
         .onChange(of: newPrinters.map(\.serial)) {
             if !autoPicked, host.isEmpty, newPrinters.count == 1, let only = newPrinters.first {
                 autoPicked = true
                 pick(only)
             }
         }
+    }
+
+    /// The search can't get out: say why, and where the switch is.
+    private var localNetworkNotice: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.paused)
+            Text(LocalNetwork.advice)
+                .font(.system(size: 12))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button("Open Settings") { LocalNetwork.openSettings() }
+                .controlSize(.small)
+        }
+        .panel(radius: 14, padding: 12, tint: Palette.paused)
     }
 
     private var hero: some View {
@@ -395,16 +429,78 @@ struct SetupPage: View {
     }
 
     private var canConnect: Bool {
-        !host.trimmingCharacters(in: .whitespaces).isEmpty && !serial.trimmingCharacters(in: .whitespaces).isEmpty
-            && code.trimmingCharacters(in: .whitespaces).count >= 4 && store.phase != .connecting
+        missingStep == nil && !identifying && store.phase != .connecting
+    }
+
+    /// What Connect still needs. Not the serial: when it is left blank, it is read from the printer.
+    private var missingStep: String? {
+        if host.trimmingCharacters(in: .whitespaces).isEmpty {
+            return newPrinters.isEmpty && slicerOnlyPrinters.isEmpty
+                ? "Bambu Bar hasn't found your printer yet. Type its IP address under \u{201C}Enter address manually\u{201D}."
+                : "Choose your printer above, or enter its address manually."
+        }
+        if code.trimmingCharacters(in: .whitespaces).count < 4 { return "Enter the printer's access code." }
+        return nil
     }
 
     private func connect() {
-        guard canConnect else { return }
+        guard canConnect else {
+            attempted = true
+            if host.trimmingCharacters(in: .whitespaces).isEmpty && newPrinters.isEmpty && slicerOnlyPrinters.isEmpty {
+                manual = true
+            }
+            return
+        }
+        problem = nil
+        let address = host.trimmingCharacters(in: .whitespaces)
+        if !serial.trimmingCharacters(in: .whitespaces).isEmpty {
+            finishConnecting()
+        } else if let seen = store.discovered.first(where: { $0.host == address }) {
+            if adopt(seen.serial) { finishConnecting() }
+        } else {
+            identifying = true
+            Task {
+                let result = await store.identifyPrinter(at: address)
+                identifying = false
+                // The person may have moved on to another address meanwhile.
+                guard host.trimmingCharacters(in: .whitespaces) == address else { return }
+                switch result {
+                case .success(let found):
+                    if adopt(found) { finishConnecting() }
+                case .failure(let failure):
+                    problem = failure.message
+                }
+            }
+        }
+    }
+
+    /// Takes the serial found for a typed address. A code that came with the printer picked before belongs to
+    /// that one: swap in this printer's code from the slicer, or ask for it. False when the code is now missing.
+    private func adopt(_ found: String) -> Bool {
+        serial = found
+        if codeSource != nil, store.slicerPrinter(serial: found)?.accessCodes.first != code {
+            code = ""
+            codeSource = nil
+            alternativeCodes = []
+            fillCodeFromSlicer()
+        }
+        guard code.trimmingCharacters(in: .whitespaces).count >= 4 else {
+            attempted = true
+            codeFocused = true
+            return false
+        }
+        return true
+    }
+
+    private func finishConnecting() {
+        let serial = self.serial.trimmingCharacters(in: .whitespaces).uppercased()
+        let seen = store.discovered.first { $0.serial == serial }
+        let typedName = name.trimmingCharacters(in: .whitespaces)
         let config = PrinterConfig(host: host.trimmingCharacters(in: .whitespaces),
-                                   serial: serial.trimmingCharacters(in: .whitespaces).uppercased(),
-                                   name: name.trimmingCharacters(in: .whitespaces).isEmpty ? serial : name,
-                                   modelCode: modelCode)
+                                   serial: serial,
+                                   name: typedName.isEmpty ? store.announcedName(for: serial) ?? serial : typedName,
+                                   // Typed in by hand, the serial's prefix tells the model better than the default.
+                                   modelCode: selected == serial ? modelCode : seen?.modelCode ?? "")
         let firstPrinter = !adding
         store.connect(to: config, accessCode: code, alternatives: alternativeCodes)
         navigation.addingPrinter = false

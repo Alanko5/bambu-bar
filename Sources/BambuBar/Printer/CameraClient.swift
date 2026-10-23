@@ -2,7 +2,6 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Network
-import Security
 
 /// How a printer serves its camera on the LAN.
 enum CameraTransport: Equatable {
@@ -114,19 +113,14 @@ final class CameraSocket {
 
     /// Call on `queue`.
     func open(timeout: TimeInterval = 10) {
-        let tls = NWProtocolTLS.Options()
-        let sec = tls.securityProtocolOptions
-        // Like the MQTT broker, the P2S never answers a TLS 1.3 ClientHello.
-        sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
-        sec_protocol_options_set_max_tls_protocol_version(sec, .TLSv12)
-        sec_protocol_options_set_verify_block(sec, { [weak self] _, trust, complete in
-            guard let self else { return complete(false) }
-            if self.insecure { return complete(true) }
-            let verdict = BambuTrust.evaluate(sec_trust_copy_ref(trust).takeRetainedValue(), serial: self.serial)
+        let tls = MQTTClient.tlsOptions(queue: queue) { [weak self] trust in
+            guard let self else { return false }
+            if self.insecure { return true }
+            let verdict = BambuTrust.evaluate(trust, serial: self.serial)
             self.verdict = verdict
             self.log?("certificate on port \(self.port): \(verdict)")
-            complete(!verdict.isRejected)
-        }, queue)
+            return !verdict.isRejected
+        }
         let tcp = NWProtocolTCP.Options()
         tcp.connectionTimeout = Int(timeout)
         tcp.noDelay = true

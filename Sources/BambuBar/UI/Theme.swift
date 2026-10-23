@@ -63,8 +63,12 @@ struct TemperatureTiles: View {
 
     var body: some View {
         if let left = status.secondNozzle {
-            TemperatureTile(fillsHeight: fillsHeight, title: "Left", symbol: "flame.fill", temperature: left, tint: Palette.nozzle)
-            TemperatureTile(fillsHeight: fillsHeight, title: "Right", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle)
+            // Both nozzles: the idle one can be still warm, so the one printing gets a dot.
+            let printing = status.state.isActive
+            TemperatureTile(fillsHeight: fillsHeight, title: "Left", symbol: "flame.fill", temperature: left, tint: Palette.nozzle,
+                            inUse: printing && status.leftNozzleInUse == true)
+            TemperatureTile(fillsHeight: fillsHeight, title: "Right", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle,
+                            inUse: printing && status.leftNozzleInUse == false)
         } else {
             TemperatureTile(fillsHeight: fillsHeight, title: "Nozzle", symbol: "flame.fill", temperature: status.nozzle, tint: Palette.nozzle)
         }
@@ -94,6 +98,8 @@ struct TemperatureTile: View {
     var temperature: Temperature?
     var plain: Double? = nil
     var tint: Color
+    /// The nozzle printing on a two-nozzle model.
+    var inUse = false
 
     var body: some View {
         let current = temperature?.current ?? plain
@@ -103,6 +109,10 @@ struct TemperatureTile: View {
                     .foregroundStyle(heating ? tint : .secondary)
                     .symbolEffect(.pulse, options: .repeating, isActive: changing)
                 Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                if inUse {
+                    Circle().fill(tint).frame(width: 5, height: 5).help("Printing with this nozzle")
+                }
             }
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(current.map { "\(Int($0.rounded()))°" } ?? "–")
@@ -123,7 +133,7 @@ struct TemperatureTile: View {
         .frame(maxHeight: fillsHeight ? .infinity : nil, alignment: .topLeading)
         .panel(radius: 14, padding: 11)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title) \(current.map { "\(Int($0)) degrees" } ?? "unknown")"
+        .accessibilityLabel("\(title)\(inUse ? ", in use" : "") \(current.map { "\(Int($0)) degrees" } ?? "unknown")"
                             + (changing ? ", \(temperature!.current < temperature!.target ? "heating" : "cooling") to \(Int(temperature!.target))" : ""))
     }
 

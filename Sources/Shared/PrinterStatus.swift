@@ -211,6 +211,8 @@ struct PrinterStatus: Codable, Equatable, Sendable {
     var chamberTarget: Double?
     /// The left nozzle on two-nozzle models (`nozzle` is the right one, as Bambu Studio numbers them).
     var secondNozzle: Temperature?
+    /// On two-nozzle models, whether the left nozzle is the one printing.
+    var leftNozzleInUse: Bool?
     /// Fan speeds in percent.
     var partFan: Int?
     var auxFan: Int?
@@ -239,6 +241,14 @@ struct PrinterStatus: Codable, Equatable, Sendable {
     var canceled: Bool = false
     /// When this status was last refreshed from the printer.
     var updatedAt = Date()
+
+    /// The nozzle that's printing: the only one, or whichever of the two is in use.
+    var activeNozzle: Temperature { leftNozzleInUse == true ? secondNozzle ?? nozzle : nozzle }
+    /// The other nozzle on two-nozzle models.
+    var idleNozzle: Temperature? { secondNozzle.map { leftNozzleInUse == true ? nozzle : $0 } }
+    /// "Nozzle", or which of the two is printing.
+    var activeNozzleTitle: String { secondNozzle == nil ? "Nozzle" : leftNozzleInUse == true ? "Left nozzle" : "Right nozzle" }
+    var idleNozzleTitle: String { leftNozzleInUse == true ? "Right nozzle" : "Left nozzle" }
 
     /// "Canceled" for a job someone stopped, otherwise the state's own title.
     var stateTitle: String { state == .failed && canceled ? "Canceled" : state.title }

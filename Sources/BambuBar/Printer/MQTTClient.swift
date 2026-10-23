@@ -25,6 +25,8 @@ final class MQTTClient {
         case refused(UInt8)
         case certificate(String)
         case unreachable(String)
+        /// macOS keeps the app off the local network (Privacy & Security → Local Network).
+        case localNetworkDenied
         case timedOut
         case closed
         case malformed
@@ -92,18 +94,13 @@ final class MQTTClient {
     // MARK: - Connection
 
     private func start() {
-        let tls = NWProtocolTLS.Options()
-        let sec = tls.securityProtocolOptions
-        // P2S firmware never answers a TLS 1.3 ClientHello.
-        sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
-        sec_protocol_options_set_max_tls_protocol_version(sec, .TLSv12)
-        sec_protocol_options_set_verify_block(sec, { [weak self] _, trust, complete in
-            guard let self else { return complete(false) }
-            if self.config.insecure { return complete(true) }
-            let verdict = BambuTrust.evaluate(sec_trust_copy_ref(trust).takeRetainedValue(), serial: self.config.serial)
+        let tls = Self.tlsOptions(queue: queue) { [weak self] trust in
+            guard let self else { return false }
+            if self.config.insecure { return true }
+            let verdict = BambuTrust.evaluate(trust, serial: self.config.serial)
             self.trustVerdict = verdict
-            complete(!verdict.isRejected)
-        }, queue)
+            return !verdict.isRejected
+        }
         let tcp = NWProtocolTCP.Options()
         tcp.connectionTimeout = Int(config.connectTimeout)
         tcp.enableKeepalive = true
@@ -128,7 +125,9 @@ final class MQTTClient {
             sendConnect()
             receive()
         case .waiting(let error), .failed(let error):
-            if let verdict = trustVerdict, case .rejected(let reason) = verdict {
+            if connection?.currentPath?.unsatisfiedReason == .localNetworkDenied {
+                finish(.localNetworkDenied)
+            } else if let verdict = trustVerdict, case .rejected(let reason) = verdict {
                 finish(.certificate(reason))
             } else {
                 // No route (Wi-Fi down, printer off) or a refused connection: give up so the owner can back off.
@@ -139,6 +138,19 @@ final class MQTTClient {
         default:
             break
         }
+    }
+
+    /// TLS as the printers speak it, with the certificate decision left to `verify`.
+    static func tlsOptions(queue: DispatchQueue, verify: @escaping (SecTrust) -> Bool) -> NWProtocolTLS.Options {
+        let tls = NWProtocolTLS.Options()
+        let sec = tls.securityProtocolOptions
+        // P2S firmware never answers a TLS 1.3 ClientHello.
+        sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
+        sec_protocol_options_set_max_tls_protocol_version(sec, .TLSv12)
+        sec_protocol_options_set_verify_block(sec, { _, trust, complete in
+            complete(verify(sec_trust_copy_ref(trust).takeRetainedValue()))
+        }, queue)
+        return tls
     }
 
     static func describe(_ error: NWError) -> String {

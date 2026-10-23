@@ -46,6 +46,25 @@ enum BambuTrust {
     /// Both conditions matter: the chain proves it's a Bambu device, the name proves it's *this* printer
     /// (another Bambu printer on the network must not be able to collect the access code).
     private static func check(_ trust: SecTrust, serial: String) -> Verdict {
+        switch identify(trust) {
+        case .rejected(let reason):
+            return .rejected(reason)
+        case .genuine(let name):
+            guard let name, name.caseInsensitiveCompare(serial) == .orderedSame else {
+                return .rejected("The certificate belongs to another device (\(name ?? "unnamed")).")
+            }
+            return .trusted
+        }
+    }
+
+    enum Identity: Equatable {
+        /// Chains to a bundled Bambu root; the leaf's common name is the printer's serial.
+        case genuine(name: String?)
+        case rejected(String)
+    }
+
+    /// Checks the chain alone and reads the name, which is how a printer added by its address alone is told apart.
+    static func identify(_ trust: SecTrust) -> Identity {
         SecTrustSetPolicies(trust, SecPolicyCreateBasicX509())
         SecTrustSetAnchorCertificates(trust, anchors as CFArray)
         SecTrustSetAnchorCertificatesOnly(trust, true)
@@ -53,14 +72,17 @@ enum BambuTrust {
         guard SecTrustEvaluateWithError(trust, &error) else {
             return .rejected((error as Error?)?.localizedDescription ?? "The certificate isn't from Bambu Lab.")
         }
-        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let leaf = chain.first else {
+        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], !chain.isEmpty else {
             return .rejected("The printer sent no certificate.")
         }
+        return .genuine(name: commonName(trust))
+    }
+
+    /// The leaf's common name, whether or not the chain checks out.
+    static func commonName(_ trust: SecTrust) -> String? {
+        guard let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first else { return nil }
         var name: CFString?
         SecCertificateCopyCommonName(leaf, &name)
-        guard let name = name as String?, name.caseInsensitiveCompare(serial) == .orderedSame else {
-            return .rejected("The certificate belongs to another device (\(name as String? ?? "unnamed")).")
-        }
-        return .trusted
+        return name as String?
     }
 }
