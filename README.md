@@ -51,7 +51,7 @@ It talks to the printer directly over your network, the same way Bambu Studio do
 ### Install and connect
 
 1. Download the latest `Bambu-Bar-<version>-macos.zip` from [Releases](https://github.com/rolottr/bambu-bar/releases), unzip it and move **Bambu Bar.app** to your Applications folder. Or [build it yourself](#building-from-source).
-2. Open it. The window lists the printers it finds on your network; pick yours.
+2. Open it. The window lists the printers it finds on your network; pick yours. Not listed? Open **Enter address manually** and type the printer's IP address (printer screen → **Settings → Network**); Bambu Bar reads the serial number from the printer. When macOS asks whether Bambu Bar may find devices on your local network, click **Allow**: without it the app can't see or reach any printer, and it says so with a button to the right switch in System Settings.
 3. The **access code** usually fills itself in: if Bambu Studio or OrcaSlicer on this Mac has used the printer, Bambu Bar reads the code from its settings. Slicer on another Mac? Drop that Mac's `~/Library/Application Support/BambuStudio/BambuStudio.conf` onto the setup page. Otherwise read it off the printer: **Settings → Network** on its screen shows the 8-character **Access Code**.
 4. Click **Connect**. The menu bar starts showing progress as soon as the printer reports in.
 

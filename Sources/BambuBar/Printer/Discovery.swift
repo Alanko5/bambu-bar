@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Network
 
 /// A printer that announced itself on the local network.
 struct DiscoveredPrinter: Identifiable, Equatable {
@@ -20,10 +21,18 @@ struct DiscoveredPrinter: Identifiable, Equatable {
 /// so the printer can be picked from a list and its IP address followed when DHCP changes it.
 final class PrinterDiscovery {
     var onFound: ((DiscoveredPrinter) -> Void)?
+    /// True when the search can't leave this Mac although it's on a network: macOS's Local Network permission
+    /// is off (or its prompt still waiting for an answer). Delivered on the main queue, on changes only.
+    var onBlocked: ((Bool) -> Void)?
 
     private var sockets: [Int32] = []
     private var running = false
     private let queue = DispatchQueue(label: "dev.rolottr.BambuBar.discovery")
+    private var monitor: NWPathMonitor?
+    // On `queue`.
+    private var networkUp = false
+    private var blocked = false
+    private var retry: DispatchSourceTimer?
 
     func start() {
         guard !running else { return }
@@ -34,6 +43,16 @@ final class PrinterDiscovery {
             let source = fd
             Thread.detachNewThread { [weak self] in self?.listen(on: source) }
         }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let up = path.status == .satisfied
+            defer { self.networkUp = up }
+            // Joining a network (or learning at launch that there is one): ask right away.
+            if up && !self.networkUp { DispatchQueue.main.async { self.search() } }
+        }
+        monitor.start(queue: queue)
+        self.monitor = monitor
         search()
     }
 
@@ -46,6 +65,9 @@ final class PrinterDiscovery {
 
     func stop() {
         running = false
+        monitor?.cancel()
+        monitor = nil
+        queue.async { self.retry?.cancel(); self.retry = nil }
         for fd in sockets { close(fd) }
         sockets.removeAll()
     }
@@ -58,20 +80,43 @@ final class PrinterDiscovery {
             let message = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1990\r\nMAN: \"ssdp:discover\"\r\nMX: 3\r\nST: urn:bambulab-com:device:3dprinter:1\r\n\r\n"
             var yes: Int32 = 1
             setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, socklen_t(MemoryLayout<Int32>.size))
+            var failures: [Int32] = []
             for (address, port) in [("239.255.255.250", UInt16(2021)), ("239.255.255.250", 1990), ("255.255.255.255", 2021)] {
                 var addr = sockaddr_in()
                 addr.sin_family = sa_family_t(AF_INET)
                 addr.sin_port = port.bigEndian
                 inet_pton(AF_INET, address, &addr.sin_addr)
-                _ = message.withCString { ptr in
+                let sent = message.withCString { ptr in
                     withUnsafePointer(to: &addr) {
                         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                             sendto(fd, ptr, strlen(ptr), 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
                         }
                     }
                 }
+                if sent < 0 { failures.append(errno) }
             }
+            // Denied local network access fails every send (EHOSTUNREACH) while the Mac is on a network;
+            // without a network the sends fail too, with ENETUNREACH/ENETDOWN, and that's not a permission problem.
+            let denied = self.networkUp && failures.count == 3 && !failures.contains { $0 == ENETUNREACH || $0 == ENETDOWN }
+            self.setBlocked(denied)
         }
+    }
+
+    /// On `queue`. While blocked, searches again every few seconds, so the printers turn up as soon as access is on.
+    private func setBlocked(_ value: Bool) {
+        if value, retry == nil, running {
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now() + 5, repeating: 5)
+            timer.setEventHandler { [weak self] in DispatchQueue.main.async { self?.search() } }
+            timer.resume()
+            retry = timer
+        } else if !value {
+            retry?.cancel()
+            retry = nil
+        }
+        guard value != blocked else { return }
+        blocked = value
+        DispatchQueue.main.async { [weak self] in self?.onBlocked?(value) }
     }
 
     private static func openSocket(port: UInt16) -> Int32? {
@@ -114,6 +159,8 @@ final class PrinterDiscovery {
             let sender = String(cString: ip)
             let text = String(decoding: buffer[0..<n], as: UTF8.self)
             if let printer = Self.parse(text, sender: sender) {
+                // A printer got through, so nothing is blocked (whatever the last search's sends said).
+                queue.async { [weak self] in self?.setBlocked(false) }
                 DispatchQueue.main.async { [weak self] in self?.onFound?(printer) }
             }
         }

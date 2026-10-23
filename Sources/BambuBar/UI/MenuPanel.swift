@@ -520,6 +520,9 @@ struct ConnectionCard: View {
                 HStack(spacing: 8) {
                     if store.phase == .connecting {
                         ProgressView().controlSize(.small)
+                    } else if store.phase == .localNetworkDenied {
+                        Button("Open Local Network Settings") { LocalNetwork.openSettings() }
+                            .controlSize(.small)
                     } else if store.phase == .unauthorized, let known = store.replacementCode {
                         Button("Use Code from \(known.source)") { store.useReplacementCode() }
                             .controlSize(.small)
@@ -544,6 +547,7 @@ struct ConnectionCard: View {
         case .connecting: return "Connecting to \(store.printerName)…"
         case .unauthorized: return "Access code rejected"
         case .certificate: return "Can't verify the printer"
+        case .localNetworkDenied: return "Bambu Bar can't reach your network"
         default: return "\(store.printerName) is offline"
         }
     }

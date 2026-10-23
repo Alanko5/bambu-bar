@@ -102,6 +102,7 @@ final class PrinterSession: Identifiable {
         case .offline: return "Offline"
         case .unauthorized: return "Access code rejected"
         case .certificate: return "Certificate not trusted"
+        case .localNetworkDenied: return "No local network access"
         }
     }
 
@@ -110,6 +111,7 @@ final class PrinterSession: Identifiable {
         case .offline(let reason): return reason
         case .unauthorized: return "Check the access code on the printer's screen (Settings → Network) and enter it again."
         case .certificate(let reason): return "The printer's TLS certificate couldn't be verified: \(reason)"
+        case .localNetworkDenied: return LocalNetwork.advice
         default: return nil
         }
     }
