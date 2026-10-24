@@ -142,6 +142,7 @@ final class CameraFeed {
         guard let session else { return "No printer." }
         if session.isDemo { return "The demo printer has no camera." }
         if PrinterStore.emulatorSettings != nil { return "The mock fleet's printers have no camera." }
+        guard session.hasCamera else { return "Bambu Bar can't show this printer's camera." }
         guard session.isOnline else { return "The camera starts when the printer is connected." }
         if session.cameraTransport == .rtsps && session.status?.liveViewEnabled == false {
             return "Turn on LAN Only Liveview on the printer (Settings → Network) to see the camera here."
@@ -155,12 +156,14 @@ final class CameraFeed {
             state = .unavailable(reason)
             return
         }
-        guard let session, let code = session.cameraAccessCode else {
+        guard let session, let transport = session.cameraTransport else { return }
+        // The WebRTC camera needs no access code.
+        guard let code = transport == .webrtc ? "" : session.cameraAccessCode else {
             state = .unavailable("The access code isn't available.")
             return
         }
-        let client = makeCameraClient(CameraConfig(host: session.config.host, serial: session.config.serial, accessCode: code,
-                                                   transport: session.cameraTransport, insecure: session.allowsInsecureTLS))
+        let client = makeCameraClient(CameraConfig(host: session.config.endpoint.host, serial: session.config.serial, accessCode: code,
+                                                   transport: transport, insecure: session.allowsInsecureTLS))
         client.onEvent = { [weak self, weak client] event in
             MainActor.assumeIsolated {
                 guard let self, let client, client === self.client else { return }

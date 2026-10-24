@@ -106,7 +106,7 @@ enum Probe {
 
     // MARK: - Camera
 
-    /// `--probe-camera <host> <serial> <access-code> [seconds] [--jpeg|--rtsp] [--model <name>]`: opens the camera
+    /// `--probe-camera <host> <serial> <access-code> [seconds] [--jpeg|--rtsp|--webrtc] [--model <name>]`: opens the camera
     /// like the app does, logs the handshake (certificate, RTSP replies, SDP) and the frames, decodes the first one
     /// and saves it as a PNG in the temporary folder. Without `--jpeg`/`--rtsp`, the model decides (a P2S if unknown).
     static var cameraArguments: (host: String, serial: String, code: String, seconds: Double, transport: CameraTransport)? {
@@ -119,6 +119,7 @@ enum Probe {
         var transport = CameraTransport.forModel(model?.name ?? "P2S")
         if a.contains("--jpeg") { transport = .jpeg }
         if a.contains("--rtsp") { transport = .rtsps }
+        if a.contains("--webrtc") { transport = .webrtc }
         return (a[i + 1], a[i + 2], a[i + 3], seconds, transport)
     }
 
@@ -158,12 +159,17 @@ enum Probe {
                 exit(1)
             }
         }
-        log("opening \(transport == .rtsps ? "RTSPS on port 322" : "the JPEG stream on port 6000") at \(host)")
+        let description = switch transport {
+        case .rtsps: "RTSPS on port 322"
+        case .jpeg: "the JPEG stream on port 6000"
+        case .webrtc: "WebRTC on port 8000"
+        }
+        log("opening \(description) at \(host)")
         client.start()
         Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             MainActor.assumeIsolated {
                 // JPEG frames arrive decoded, so only the video stream has keyframes and a byte count.
-                log(transport == .jpeg ? "\(frames) frames so far" : "\(frames) frames, \(keyframes) keyframes, \(bytes / 1024) KB so far")
+                log(transport != .rtsps ? "\(frames) frames so far" : "\(frames) frames, \(keyframes) keyframes, \(bytes / 1024) KB so far")
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {

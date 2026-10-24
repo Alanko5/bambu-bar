@@ -26,7 +26,7 @@ struct OverviewPage: View {
                 }
                 ForEach(status.issues) { IssueBanner(issue: $0) }
                 // The demo printers have no camera; keep it out of their screenshots too.
-                if let session = store.current, !session.isDemo {
+                if let session = store.current, !session.isDemo, session.hasCamera {
                     CameraCard(session: session)
                 }
                 metrics(status)

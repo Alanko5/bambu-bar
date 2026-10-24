@@ -28,7 +28,7 @@ It talks to the printer directly over your network, the same way Bambu Studio do
 | --- | --- |
 | **Menu bar** | A printer glyph that fills as the print grows, with progress and time left beside it (or just one, or only the icon), and a pause or alert mark when the printer needs you. |
 | **Panel** | The job, its stage ("Heating hotend", "Paused: filament ran out"), percentage, layers, time left and finish time; nozzle, bed and chamber temperatures; AMS spools with what's left and the humidity; printer errors in plain words, in Bambu Lab's own translation. |
-| **Camera** | The printer's live view on the Printer page, in a collapsible preview in the panel, and in its own resizable window that can stay on top. It streams only while it's on screen, unless you choose in Settings to keep it connected during prints so it shows at once. X1, H2, P2S and X2D use RTSPS (turn on **LAN Only Liveview** on the printer); P1 and A1 use their JPEG stream. |
+| **Camera** | The printer's live view on the Printer page, in a collapsible preview in the panel, and in its own resizable window that can stay on top. It streams only while it's on screen, unless you choose in Settings to keep it connected during prints so it shows at once. X1, H2, P2S and X2D use RTSPS (turn on **LAN Only Liveview** on the printer); P1 and A1 use their JPEG stream; a Creality K1 uses its WebRTC stream. |
 | **Grams left** | Bambu Lab spools tell the AMS their net weight, so Bambu Bar shows filament left in grams (≈ 810 g), not just a percentage, and how much you have on hand in total. |
 | **Named filament** | Bambu Lab spools show their colour by name (Grass Green, Charcoal). Other spools show the maker and product of the preset you set the slot to on the printer or in Bambu Studio, such as SUNLU PLA Matte. |
 | **Controls** | Pause, resume, stop (with a confirmation), print speed (Silent, Standard, Sport, Ludicrous) and a chamber light switch. |
@@ -75,8 +75,8 @@ Besides Bambu Lab printers, Bambu Bar can watch a Klipper printer through [Moonr
 
 To add one: **Add Printer** → **Enter address manually**, tick **Klipper printer with Moonraker**, type the printer's IP address and click **Connect**. There is no access code. Bambu Bar checks that Moonraker answers at that address before it saves the printer.
 
-- **Works:** progress, time left and layers, nozzle, bed and chamber temperatures, the light, pause, resume and stop, print speed, and the widget.
-- **Doesn't:** AMS and HMS errors (Klipper has neither), the camera, and finding printers on its own (discovery only knows Bambu Lab printers, so type the address). Moonraker is used without an API key, so use it only on a network you trust.
+- **Works:** progress, time left and layers, nozzle, bed and chamber temperatures, the light, pause, resume and stop, print speed, and the widget. On a Creality K1 also the camera, from the printer's own WebRTC stream on port 8000.
+- **Doesn't:** AMS and HMS errors (Klipper has neither), the camera on other Klipper printers, and finding printers on its own (discovery only knows Bambu Lab printers, so type the address). Moonraker is used without an API key, so use it only on a network you trust.
 
 ## Desktop widgets
 
@@ -158,7 +158,7 @@ The [GitHub Actions workflow](.github/workflows/build.yml) builds and uploads an
 - `scripts/fleet/run.sh` starts a mock fleet of 12 printers in Docker (P2S, P1S, P1P, X1C, X1E, H2D, H2S, H2C, A1, A1 mini; printing, paused, failed, finished, idle and one switched off) and opens Bambu Bar against it with `--emulator`. Add `--import` to start on the Add Printer page and try **Add All**, `SSDP=1` to have the printers announce their names and models, `--stop` to stop it. The fleet writes `scripts/fleet/out/BambuStudio.conf` the way Bambu Studio saves LAN printers. Nothing from an `--emulator` run is saved: not the printers, their codes, the history or the widgets' data.
 - `--probe <ip> <serial> <access-code|keychain> [seconds] [--raw-filament]` connects to a printer from Terminal and prints what it reports (`keychain` uses the code Bambu Bar saved).
 - `--probe-moonraker <ip[:port]> [seconds]` does the same for a Klipper printer with Moonraker: it asks `/printer/info`, connects and prints what it reports. It only reads.
-- `--probe-camera <ip> <serial> <access-code> [seconds] [--model P1S | --jpeg | --rtsp]` opens the camera from Terminal, logs the handshake (certificate, RTSP replies, SDP) and frame rate, and saves the first decoded frame to `$TMPDIR/bambubar-camera.png`. The transport follows the model from `--model` or the serial.
+- `--probe-camera <ip> <serial> <access-code> [seconds] [--model P1S | --jpeg | --rtsp | --webrtc]` opens the camera from Terminal (`--webrtc` for a Creality K1; the serial and code are then ignored), logs the handshake (certificate, RTSP replies, SDP) and frame rate, and saves the first decoded frame to `$TMPDIR/bambubar-camera.png`. The transport follows the model from `--model` or the serial.
 - `scripts/showcase.sh <dir>` screenshots the panel, window and widgets in each demo state; `scripts/make-readme-animations.sh` renders the animations above, offscreen, from the demo printer.
 - `scripts/make-hms.py` regenerates the bundled error texts.
 - `scripts/make-filaments.py Resources/filaments.json` regenerates the filament presets and Bambu Lab colour names from Bambu Studio.

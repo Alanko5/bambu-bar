@@ -108,7 +108,8 @@ final class PrinterSession: Identifiable {
     var accessCode: String? { Keychain.accessCode(for: config.serial) }
     var isDemo: Bool { demo != nil }
     var allowsInsecureTLS: Bool { insecure }
-    var cameraTransport: CameraTransport { CameraTransport.forModel(config.modelName) }
+    var cameraTransport: CameraTransport? { config.cameraTransport }
+    var hasCamera: Bool { cameraTransport != nil }
     var cameraAccessCode: String? { activeCode ?? accessCode }
 
     var linkSummary: String {

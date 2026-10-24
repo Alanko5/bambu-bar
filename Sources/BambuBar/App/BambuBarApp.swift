@@ -69,7 +69,7 @@ struct AppCommands: Commands {
                 .disabled(!store.isOnline || store.status?.chamberLightOn == nil)
             Button("Show Camera") { if let session = store.current { CameraWindow.show(session) } }
                 .keyboardShortcut("k")
-                .disabled(store.current?.isDemo ?? true)
+                .disabled(store.current.map { $0.isDemo || !$0.hasCamera } ?? true)
         }
     }
 }

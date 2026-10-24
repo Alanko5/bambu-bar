@@ -44,6 +44,14 @@ struct PrinterConfig: Codable, Equatable {
         return (String(parts[0]), port)
     }
 
+    /// How the printer serves its camera, nil when Bambu Bar can't show it (Klipper printers other than the K1).
+    var cameraTransport: CameraTransport? {
+        switch printerKind {
+        case .bambu: return CameraTransport.forModel(modelName)
+        case .moonraker: return model?.maker == "Creality" ? .webrtc : nil
+        }
+    }
+
     /// The session id for a Moonraker printer at `host`.
     static func moonrakerID(host: String) -> String { "klipper-\(host.lowercased())" }
 }

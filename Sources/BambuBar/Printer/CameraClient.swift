@@ -9,6 +9,8 @@ enum CameraTransport: Equatable {
     case rtsps
     /// A proprietary TLS stream of JPEG frames on port 6000 (P1, A1).
     case jpeg
+    /// H.264 over WebRTC, signalled on port 8000 (Creality K1 series, through Moonraker).
+    case webrtc
 
     static func forModel(_ modelName: String) -> CameraTransport {
         switch modelName {
@@ -17,7 +19,13 @@ enum CameraTransport: Equatable {
         }
     }
 
-    var port: UInt16 { self == .rtsps ? 322 : 6000 }
+    var port: UInt16 {
+        switch self {
+        case .rtsps: return 322
+        case .jpeg: return 6000
+        case .webrtc: return 8000
+        }
+    }
 }
 
 struct CameraConfig {
@@ -82,6 +90,7 @@ func makeCameraClient(_ config: CameraConfig) -> CameraClient {
     switch config.transport {
     case .rtsps: return RTSPCameraClient(config)
     case .jpeg: return JPEGCameraClient(config)
+    case .webrtc: return WebRTCCameraClient(config)
     }
 }
 
