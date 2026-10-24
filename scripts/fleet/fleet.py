@@ -42,7 +42,8 @@ MODELS = {
     "N1": ("A1 mini", "030", "lite", 1, None),
     "N6": ("X2D", "20P", "pro2", 2, 65),
 }
-AMS_MODULE = {"pro2": ("n3f", "AMS 2 Pro", "10001003"), "ams": ("ams", "AMS", "10001001"), "lite": ("ams_f1", "AMS Lite", "10001002")}
+AMS_MODULE = {"pro2": ("n3f", "AMS 2 Pro", "10001003"), "ams": ("ams", "AMS", "10001001"), "lite": ("ams_f1", "AMS Lite", "10001002"),
+              "ht": ("n3s", "AMS HT", "10001004")}
 
 # Bambu Lab spools: (product, preset, colour code, RRGGBB, material). Colour codes are Bambu Studio's.
 def bambu(product, preset, code, hex_, material, remain):
@@ -68,7 +69,12 @@ SUNLU_WHITE = third("GFSNL03", "FFFFFF", "PLA")
 GENERIC_PETG = third("GFG99", "2E7D5B", "PETG")
 ESUN_RED = third("GFL03", "D23A3A", "PLA")
 
-# name, model, state, job, progress %, job minutes, active slot, spools (AMS slots, or the external spool)
+# The most an H2 takes: AMS 2 Pro B-D after the first one, then eight single-slot AMS HTs (ids 128-135).
+H2C_UNITS = [("pro2", [SILVER, IVORY, None, PETG_BLUE]), ("pro2", [COBALT, SUNLU_WHITE, PETG_GRAY, CHARCOAL]),
+             ("pro2", [TURQ, ESUN_RED, SILK_GREEN, ORANGE])] + [("ht", [s]) for s in
+             [SUNLU_PINK, PETG_BLUE, ORANGE, IVORY, GRASS, ABS_AZURE, PA6CF, None]]
+
+# name, model, state, job, progress %, job minutes, active slot, spools (AMS slots, or the external spool)[, more units]
 PRINTERS = [
     ("Workshop P2S", "N7", "RUNNING", "Planetary Gearbox", 42, 210, 1, [SUNLU_PINK, GRASS, CHARCOAL, IVORY]),
     ("Garage P1S", "C12", "RUNNING", "Cable Clips x24", 77, 95, 0, [ORANGE, COBALT, None, TURQ]),
@@ -80,7 +86,7 @@ PRINTERS = [
     ("A1 Desk", "N2S", "FINISH", "Desk Organizer", 100, 120, 3, [GRASS, SUNLU_WHITE, COBALT, ORANGE]),
     ("X2D Shop", "N6", "RUNNING", "R40", 44, 240, 0, [ABS_AZURE, CHARCOAL, PETG_GRAY, None]),
     ("Mini", "N1", "FAILED", "3DBenchy", 23, 50, 0, [ORANGE, None, None, None]),
-    ("H2C Batch", "O1C", "RUNNING", "Gridfinity Bins", 35, 600, 0, [ORANGE, IVORY, COBALT, GRASS]),
+    ("H2C Batch", "O1C", "RUNNING", "Gridfinity Bins", 35, 600, 0, [ORANGE, IVORY, COBALT, GRASS], H2C_UNITS),
     ("Spare P1S", "C12", "OFFLINE", "", 0, 0, None, []),
 ]
 
@@ -122,9 +128,14 @@ def encode_ip(ip, key):
 
 class Printer:
     def __init__(self, index, spec, sample, client):
-        name, code, state, job, progress, minutes, active, spools = spec
+        name, code, state, job, progress, minutes, active, spools = spec[:8]
         self.name, self.code, self.job_minutes, self.spools = name, code, minutes, spools
         product, prefix, self.ams_kind, self.nozzles, self.heater = MODELS[code]
+        # (unit id, AMS kind, spools) for every unit: four-slot ones from 0, AMS HTs from 128
+        self.units = [(0, self.ams_kind, spools)] if self.ams_kind else []
+        for kind, unit_spools in (spec[8] if len(spec) > 8 else []):
+            ids = [u[0] for u in self.units if (u[0] >= 128) == (kind == "ht")]
+            self.units.append((max(ids) + 1 if ids else (128 if kind == "ht" else 0), kind, unit_spools))
         self.product = product
         self.index = index
         self.serial = f"{prefix}F{index + 1:011d}"
@@ -149,9 +160,9 @@ class Printer:
             m["sn"] = self.serial
             if m["name"] == "ota":
                 m["product_name"] = f"Bambu Lab {self.product}"
-        if self.ams_kind:
-            prefix, title, _ = AMS_MODULE[self.ams_kind]
-            modules.append({"name": f"{prefix}/0", "product_name": f"{title} (1)", "sn": f"{self.serial}-AMS",
+        for n, (unit_id, kind, _) in enumerate(self.units):
+            prefix, title, _ = AMS_MODULE[kind]
+            modules.append({"name": f"{prefix}/{unit_id}", "product_name": f"{title} ({n + 1})", "sn": f"{self.serial}-AMS{n}",
                             "hw_ver": "", "sw_ver": "01.00.00.00", "loader_ver": "00.00.00.00", "flag": 0, "visible": True})
         version["info"]["module"] = modules
         return version
@@ -236,15 +247,22 @@ class Printer:
                                       {"id": 48, "func": 1, "range": 6553600, "state": 40 if self.state == "RUNNING" else 0}]
         ams = r["ams"]
         if self.ams_kind:
-            unit = copy.deepcopy(ams["ams"][0])
-            unit["info"] = AMS_MODULE[self.ams_kind][2]
-            unit["humidity_raw"] = str(random.randint(18, 52))
-            unit["humidity"] = "1" if self.ams_kind == "lite" else str(random.randint(1, 4))
-            unit["temp"] = f"{random.uniform(24, 31):.1f}"
-            unit["tray"] = [self.tray(template, slot, spool) for slot, spool in enumerate((self.spools + [None] * 4)[:4])]
-            ams["ams"] = [unit]
-            loaded = sum(1 << slot for slot, spool in enumerate(self.spools[:4]) if spool)
-            ams.update({"ams_exist_bits": "1", "tray_exist_bits": f"{loaded:x}", "tray_is_bbl_bits": "f",
+            units, loaded = [], 0
+            for unit_id, kind, unit_spools in self.units:
+                unit = copy.deepcopy(ams["ams"][0])
+                unit["id"] = str(unit_id)
+                unit["info"] = AMS_MODULE[kind][2]
+                unit["humidity_raw"] = str(random.randint(18, 52))
+                unit["humidity"] = "1" if kind == "lite" else str(random.randint(1, 4))
+                unit["temp"] = f"{random.uniform(24, 31):.1f}"
+                slots = 1 if kind == "ht" else 4
+                unit["tray"] = [self.tray(template, slot, spool) for slot, spool in enumerate((unit_spools + [None] * slots)[:slots])]
+                units.append(unit)
+                for slot, spool in enumerate(unit_spools[:slots]):
+                    if spool:
+                        loaded |= 1 << (16 + unit_id - 128 if unit_id >= 128 else unit_id * 4 + slot)
+            ams["ams"] = units
+            ams.update({"ams_exist_bits": f"{(1 << len(units)) - 1:x}", "tray_exist_bits": f"{loaded:x}", "tray_is_bbl_bits": f"{loaded:x}",
                         "tray_read_done_bits": f"{loaded:x}", "tray_now": str(self.active if self.active is not None else 255)})
             external = None
         else:

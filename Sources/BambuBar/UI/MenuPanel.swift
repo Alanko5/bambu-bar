@@ -51,7 +51,7 @@ struct MenuPanel: View {
                 }
                 temperatures(status)
                 if !status.ams.isEmpty || status.externalSpool?.isLoaded == true {
-                    FilamentStrip(status: status)
+                    FilamentStrip(status: status, maxHeight: 360)
                 }
                 if status.state.isActive {
                     PrintControls(status: status)
@@ -412,8 +412,35 @@ struct TightLabelStyle: LabelStyle {
 /// One row per AMS unit (and the external spool), with spools, material and how much is left.
 struct FilamentStrip: View {
     var status: PrinterStatus
+    /// Past this height the units scroll inside the card. An H2 takes four AMS and eight AMS HTs, and the menu
+    /// bar panel can't scroll or grow past the screen.
+    var maxHeight: CGFloat?
 
     var body: some View {
+        if let maxHeight {
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    units.padding(12)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                // Opens on the unit feeding the print, which may be one of the lower ones.
+                .onAppear { if let unit = activeUnit { proxy.scrollTo(unit, anchor: .center) } }
+            }
+            .frame(maxHeight: maxHeight)
+            .fixedSize(horizontal: false, vertical: true)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .panel(radius: 18, padding: 0)
+        } else {
+            units.panel(radius: 18, padding: 12)
+        }
+    }
+
+    private var activeUnit: Int? {
+        guard status.state.isActive, let id = status.activeSpoolID else { return nil }
+        return status.ams.first { unit in unit.spools.contains { $0.id == id } }?.id
+    }
+
+    private var units: some View {
         VStack(alignment: .leading, spacing: 9) {
             ForEach(status.ams) { unit in
                 VStack(alignment: .leading, spacing: 8) {
@@ -434,7 +461,7 @@ struct FilamentStrip: View {
                 HStack { spoolColumn(ext); Spacer() }
             }
         }
-        .panel(radius: 18, padding: 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func climate(_ unit: AMSUnit) -> String? {
