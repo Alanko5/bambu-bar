@@ -201,7 +201,8 @@ final class PrinterConnection {
     }
 
     private func openMoonraker(host: String, port: UInt16) {
-        let moonraker = MoonrakerClient(host: host, port: port)
+        // A Creality K1 prepares a print (self-test, levelling, heating) before Klipper hears of it.
+        let moonraker = MoonrakerClient(host: host, port: port, crealityHost: config?.model?.maker == "Creality" ? host : nil)
         moonraker.onEvent = { [weak self, weak moonraker] event in
             MainActor.assumeIsolated {
                 guard let self, let moonraker, moonraker === self.moonraker else { return }

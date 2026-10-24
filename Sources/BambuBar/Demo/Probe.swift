@@ -75,7 +75,7 @@ enum Probe {
             print(String(format: "[%5.1fs] ", Date().timeIntervalSince(started)) + text)
             fflush(stdout)
         }
-        let config = PrinterConfig(host: host, serial: "", name: host, modelCode: "", kind: .moonraker)
+        var config = PrinterConfig(host: host, serial: "", name: host, modelCode: "", kind: .moonraker)
         let endpoint = config.endpoint
         let connection = PrinterConnection()
         self.connection = connection
@@ -91,7 +91,10 @@ enum Probe {
         log("asking \(endpoint.host):\(endpoint.port) for /printer/info")
         Task { @MainActor in
             switch await MoonrakerClient.hostname(host: endpoint.host, port: endpoint.port) {
-            case .success(let name): log("Moonraker answered, Klipper host \"\(name)\"")
+            case .success(let name):
+                // The model decides what else is read (a Creality K1's own status), as when the printer is added.
+                config.modelCode = MoonrakerClient.modelCode(forHostname: name)
+                log("Moonraker answered, Klipper host \"\(name)\", model \(config.modelName)")
             case .failure(let error): log("info failed: \(error.message)")
             }
             log("connecting to \(endpoint.host):\(endpoint.port)")

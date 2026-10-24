@@ -22,8 +22,8 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
     private var nextID = 1
     private var pending: [Int: (Result<Any, RPCError>) -> Void] = [:]
 
-    /// The merged `printer.objects` state, by object name.
-    private var objects: [String: [String: Any]] = [:]
+    /// The merged `printer.objects` state, by object name; nil until the first subscription answers.
+    private var objects: [String: [String: Any]]?
     private var lightObject: String?
     private var chamberObject: String?
     /// The slicer's estimate for the file being printed, from its metadata.
@@ -38,8 +38,17 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
         var message: String
     }
 
-    init(host: String, port: UInt16) {
+    /// Creality's own status on port 9999, for what Klipper doesn't know yet (see `CrealityStateWatcher`).
+    private var creality: CrealityStateWatcher?
+
+    /// `crealityHost`: also listen to a Creality K1's stock status (only listen; nothing is sent there).
+    init(host: String, port: UInt16, crealityHost: String? = nil) {
         url = URL(string: "ws://\(host):\(port)/websocket")!
+        super.init()
+        if let crealityHost {
+            creality = CrealityStateWatcher(host: crealityHost)
+            creality?.onChange = { [weak self] in self?.publishSoon() }
+        }
     }
 
     func connect() {
@@ -53,10 +62,12 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
         self.task = task
         task.resume()
         receive()
+        creality?.connect()
     }
 
     func disconnect() {
         closed = true
+        creality?.disconnect()
         resubscribe?.cancel()
         deferredPublish?.cancel()
         task?.cancel(with: .goingAway, reason: nil)
@@ -185,9 +196,10 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func merge(_ status: [String: Any]) {
+        guard objects != nil else { return }
         for (name, value) in status {
             guard let fields = value as? [String: Any] else { continue }
-            objects[name, default: [:]].merge(fields) { _, new in new }
+            objects?[name, default: [:]].merge(fields) { _, new in new }
         }
     }
 
@@ -203,6 +215,8 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
     private func publish() {
         deferredPublish?.cancel()
         deferredPublish = nil
+        // Creality's status alone (before Klipper's objects are in) would read as preparing.
+        guard let objects else { return }
         lastPublish = Date()
         let file = objects["print_stats"]?["filename"] as? String ?? ""
         if file != metadataFile {
@@ -210,8 +224,10 @@ final class MoonrakerClient: NSObject, URLSessionWebSocketDelegate {
             estimatedSeconds = nil
             if !file.isEmpty { loadMetadata(for: file) }
         }
-        onEvent?(.status(MoonrakerParser.status(from: objects, light: lightObject, chamber: chamberObject,
-                                                estimatedSeconds: estimatedSeconds)))
+        var status = MoonrakerParser.status(from: objects, light: lightObject, chamber: chamberObject,
+                                            estimatedSeconds: estimatedSeconds)
+        if let report = creality?.report { MoonrakerParser.fill(&status, fromCreality: report) }
+        onEvent?(.status(status))
     }
 
     private func loadMetadata(for file: String) {
@@ -345,10 +361,11 @@ enum MoonrakerParser {
             s.taskID = file
         }
 
-        // M73 progress from the slicer when the file sets it, else how far into the file the printer has read.
+        // How far into the file the printer has read, as Fluidd and Mainsail show it; M73 from the slicer only
+        // when that's missing (some slicers' M73 runs well ahead of the print).
         let fileProgress = double(objects["virtual_sdcard"]?["progress"]) ?? 0
         let displayProgress = double(objects["display_status"]?["progress"]) ?? 0
-        let progress = displayProgress > 0 ? displayProgress : fileProgress
+        let progress = fileProgress > 0 ? fileProgress : displayProgress
         s.progress = s.state == .finished ? 100 : min(100, Int((progress * 100).rounded(.down)))
 
         if s.state.isActive {
@@ -404,6 +421,27 @@ enum MoonrakerParser {
         return s
     }
 
+    /// A Creality K1 runs its self-test, levelling and heating before it hands the file to Klipper, so Klipper
+    /// reports standby through all of it. The printer's own status (`state` 1 = printing) knows better.
+    static func fill(_ s: inout PrinterStatus, fromCreality report: [String: Any]) {
+        guard int(report["state"]) == 1 else { return }
+        if s.state == .idle {
+            s.state = .preparing
+            if let file = report["printFileName"] as? String, !file.isEmpty {
+                let base = (file as NSString).lastPathComponent
+                s.jobName = base.lowercased().hasSuffix(".gcode") ? String(base.dropLast(6)) : base
+                s.taskID = file
+            }
+        }
+        // The printer's own progress, time left and layers, as its screen shows them.
+        if let progress = int(report["printProgress"]) { s.progress = min(100, max(0, progress)) }
+        if let left = int(report["printLeftTime"]), left > 0 { s.remainingMinutes = Int((Double(left) / 60).rounded(.up)) }
+        if let total = int(report["TotalLayer"]), total > 0 {
+            s.totalLayers = total
+            s.layer = int(report["layer"]) ?? s.layer
+        }
+    }
+
     private static func temperature(_ fields: [String: Any]?) -> Temperature {
         Temperature(current: double(fields?["temperature"]) ?? 0, target: double(fields?["target"]) ?? 0)
     }
@@ -426,5 +464,79 @@ enum MoonrakerParser {
         case let v as NSNumber: return v.doubleValue
         default: return nil
         }
+    }
+}
+
+/// Listens to a Creality K1's stock WebSocket (`ws://<host>:9999`): it sends its whole status on connect and then
+/// the keys that changed. Only listened to, never written; it reconnects quietly, since Moonraker carries the rest.
+final class CrealityStateWatcher: NSObject, URLSessionWebSocketDelegate {
+    private(set) var report: [String: Any]?
+    var onChange: (() -> Void)?
+
+    private let url: URL
+    private var session: URLSession?
+    private var task: URLSessionWebSocketTask?
+    private var stopped = false
+    private var retry: DispatchWorkItem?
+
+    init(host: String) {
+        url = URL(string: "ws://\(host):9999")!
+    }
+
+    func connect() {
+        guard !stopped else { return }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
+        let task = session.webSocketTask(with: url)
+        task.maximumMessageSize = 4 << 20
+        self.session = session
+        self.task = task
+        task.resume()
+        receive(task)
+    }
+
+    func disconnect() {
+        stopped = true
+        retry?.cancel()
+        task?.cancel(with: .goingAway, reason: nil)
+        session?.invalidateAndCancel()
+        task = nil
+        session = nil
+    }
+
+    private func receive(_ task: URLSessionWebSocketTask) {
+        task.receive { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self, !self.stopped, task === self.task else { return }
+                switch result {
+                case .success(let message):
+                    var data: Data?
+                    switch message {
+                    case .string(let text): data = Data(text.utf8)
+                    case .data(let bytes): data = bytes
+                    @unknown default: break
+                    }
+                    if let data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        self.report = (self.report ?? [:]).merging(json) { _, new in new }
+                        self.onChange?()
+                    }
+                    self.receive(task)
+                case .failure:
+                    self.scheduleReconnect()
+                }
+            }
+        }
+    }
+
+    private func scheduleReconnect() {
+        session?.invalidateAndCancel()
+        task = nil
+        session = nil
+        report = nil
+        onChange?()
+        let work = DispatchWorkItem { [weak self] in self?.connect() }
+        retry = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: work)
     }
 }
